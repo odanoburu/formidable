@@ -57,7 +57,7 @@ termAtom = parens term
   <|> tPack
   <|> tUnpack
   -- needs to be last because we don't check if identifier is keyword
-  <|> var
+  <|> try var
   where
     var = Var () <$> identifier <?> "variable"
     abs = Abs ()
