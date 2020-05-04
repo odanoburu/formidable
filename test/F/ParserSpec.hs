@@ -47,4 +47,18 @@ spec = describe "parsing" $ do
     "let {Stack, st} = f stackADT in st" `termParsesAs`
     TUnpack () "Stack" "st" (App () (Var () "f") (Var () "stackADT")) (Var () "st")
 
-  
+  -- types
+  it "parses function types" $
+    "(lambda x:Bool -> Bool. x )" `termParsesAs`
+    Abs () "x" (TyArr TyBool TyBool) (Var () "x")
+
+  it "parses type variables" $
+    "lambda x:B. x" `termParsesAs` Abs () "x" (TyVar (-1) (-1)) (Var () "x")
+
+  it "parses the universal type" $
+    "lambda x:forall X. X. x" `termParsesAs`
+    Abs () "x" (TyAll "X" $ TyVar (-1) (-1)) (Var () "x")
+
+  it "parses the existential type" $
+    "lambda x:exists X, X. x" `termParsesAs`
+    Abs () "x" (TySome "X" $ TyVar (-1) (-1)) (Var () "x")

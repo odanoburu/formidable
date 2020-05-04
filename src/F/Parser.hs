@@ -4,8 +4,6 @@ module F.Parser where
 import Control.Monad (void)
 import Control.Monad.Combinators.Expr (makeExprParser, Operator(..))
 import Data.Char (isAlphaNum)
-import Data.List.NonEmpty (NonEmpty)
-import qualified Data.List.NonEmpty as N
 import Data.Set (Set)
 import qualified Data.Set as S
 import Data.Text (Text)
@@ -135,5 +133,3 @@ comma = void $ symbol ","
 period = void $ symbol "."
 colon = void $ symbol ":"
 
-singleton :: a -> NonEmpty a
-singleton = (N.:| [])
