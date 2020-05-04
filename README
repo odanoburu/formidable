@@ -1,2 +1,6 @@
 # -*- mode: org -*-
 #+TITLE: formidable — system F implemented in Haskell
+
+very much a WIP.
+
+following [[https://www.cis.upenn.edu/~bcpierce/tapl/][TAPL]] (not strictly though.)
