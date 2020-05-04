@@ -1,0 +1,61 @@
+name:                formidable
+version:             0.1.0.0
+github:              "odanoburu/formidable"
+license:             BSD3
+author:              "bruno cuconato"
+maintainer:          "bcclaro+haskell@gmail.com"
+copyright:           "BSD-3 License"
+
+extra-source-files:
+- README
+- ChangeLog.md
+
+# Metadata used when publishing your package
+# synopsis:            Short description of your package
+# category:            Web
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on GitHub at <https://github.com/odanoburu/formidable#readme>
+
+default-extensions:
+- DisambiguateRecordFields
+- DuplicateRecordFields
+- NamedFieldPuns
+- OverloadedStrings
+- RecordWildCards
+- TupleSections
+
+dependencies:
+- base >= 4.7 && < 5
+- containers == 0.6.*
+- megaparsec == 7.*
+- parser-combinators == 1.*
+- text == 1.2.*
+
+library:
+  source-dirs: src
+
+executables:
+  formidable-exe:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - formidable
+
+tests:
+  formidable-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - formidable
+    - hspec == 2.7.*
