@@ -20,12 +20,12 @@ import qualified Text.Megaparsec.Char.Lexer as L
 import F.Type (Term(..), Type(..))
 
 
-data SyntaxError = KeywordAsVariable Text
+data SyntaxError = KeywordAsVariable String
   deriving (Eq, Show, Ord)
 
 instance ShowErrorComponent SyntaxError where
   showErrorComponent (KeywordAsVariable kw)
-    = concat ["Can't use keyword '", T.unpack kw, "' as variable name"]
+    = concat ["Can't use keyword '", kw, "' as variable name"]
 
 type Parser = Parsec SyntaxError Text
 
@@ -92,19 +92,19 @@ keywords = S.fromList ["lambda", "in", "let", "as"]
 
 identifier :: Parser Text
 identifier = do
-  iden <- alphanum
-  if seq iden iden `S.member` seq keywords keywords
-    then keywordAsVariable iden
+  iden <- T.cons <$> letterChar <*> alphanum
+  if iden `S.member` keywords
+    then keywordAsVariable $ T.unpack iden
     else return iden
 
-keywordAsVariable :: Text -> Parser a
+keywordAsVariable :: String -> Parser a
 keywordAsVariable = customFailure . KeywordAsVariable
 
 alphanum :: Parser Text
-alphanum = lexeme $ takeWhile1P Nothing isAlphaNum
+alphanum = lexeme $ takeWhileP Nothing isAlphaNum
 
 tyIdentifier :: Parser Text
-tyIdentifier = upperChar >>= (\c -> T.cons c <$> option "" alphanum)
+tyIdentifier = T.cons <$> upperChar <*> option "" alphanum
 
 sc :: Parser ()
 sc = L.space
