@@ -10,7 +10,6 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Prelude hiding (abs)
 import Text.Megaparsec
---import Text.Megaparsec.Error (ErrorItem(..))
 import Text.Megaparsec.Char
 --import Text.Megaparsec.Debug (dbg)
 import qualified Text.Megaparsec.Char.Lexer as L
@@ -50,11 +49,12 @@ typeP = makeExprParser typeAtom table
 
 termAtom :: Parser Term
 termAtom = parens term
-  <|> try abs
+  <|> try abs  -- try because type abstraction uses lambda keyword too
   <|> tAbs
   <|> tPack
   <|> tUnpack
-  -- needs to be last because we don't check if identifier is keyword
+  -- 'try' because we may try to parse keywords as variable names, and
+  -- when this goes wrong we have to backtrack
   <|> try var
   where
     var = Var () <$> identifier <?> "variable"
