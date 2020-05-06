@@ -12,3 +12,8 @@ following [[https://www.cis.upenn.edu/~bcpierce/tapl/][TAPL]] (not strictly thou
    : stack build --pedantic
    (the first time you run this will probably take some time)
 
+* testing
+
+you can run the tests with
+: stack test
+
