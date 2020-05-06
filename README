@@ -4,3 +4,11 @@
 very much a WIP.
 
 following [[https://www.cis.upenn.edu/~bcpierce/tapl/][TAPL]] (not strictly though.)
+
+* building
+
+1. download [[https://docs.haskellstack.org/en/stable/README/][stack]]
+2. run
+   : stack build --pedantic
+   (the first time you run this will probably take some time)
+
