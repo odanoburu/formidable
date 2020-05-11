@@ -32,7 +32,7 @@ spec = describe "parsing" $ do
     App () (Abs () "y" TyBool (Var () "y")) (Var () "x")
 
   it "parses type abstraction" $
-    "(lambda X. y)" `termParsesAs`
+    "(Lambda X. y)" `termParsesAs`
     TAbs () "X" (Var () "y")
 
   it "parses type application" $

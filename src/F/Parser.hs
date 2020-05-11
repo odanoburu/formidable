@@ -49,7 +49,7 @@ typeP = makeExprParser typeAtom table
 
 termAtom :: Parser Term
 termAtom = parens term
-  <|> try abs  -- try because type abstraction uses lambda keyword too
+  <|> abs
   <|> tAbs
   <|> tPack
   <|> tUnpack
@@ -63,7 +63,7 @@ termAtom = parens term
       <*> typeP <* period
       <*> term <?> "lambda abstraction"
     tAbs = TAbs ()
-      <$> (pKeyword "lambda" *> tyIdentifier <* period)
+      <$> (pKeyword "Lambda" *> tyIdentifier <* period)
       <*> term <?> "type abstraction"
     tPack = TPack ()
       <$> (symbol "{" *> symbol "*" *> typeP)
