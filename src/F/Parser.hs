@@ -1,37 +1,61 @@
 {-# LANGUAGE StrictData #-}
-module F.Parser where
+module F.Parser (parseCommands) where
+
+
+import F.Syntax ( Command(..), Term(..), Type(..))
+
 
 import Control.Monad (void)
 import Control.Monad.Combinators.Expr (makeExprParser, Operator(..))
+import Data.Bifunctor (bimap)
 import Data.Char (isAlphaNum)
 import Data.Set (Set)
 import qualified Data.Set as S
-import Data.Text (Text)
-import qualified Data.Text as T
 import Prelude hiding (abs)
-import Text.Megaparsec
+import Text.Megaparsec hiding (State)
 import Text.Megaparsec.Char
 --import Text.Megaparsec.Debug (dbg)
 import qualified Text.Megaparsec.Char.Lexer as L
 
-import F.Type (Term(..), Type(..))
 
-
-data SyntaxError = KeywordAsVariable String
+---
+-- types
+newtype SyntaxError = KeywordAsVariable String
   deriving (Eq, Show, Ord)
 
 instance ShowErrorComponent SyntaxError where
   showErrorComponent (KeywordAsVariable kw)
     = concat ["Can't use keyword '", kw, "' as variable name"]
 
-type Parser = Parsec SyntaxError Text
+type Parser = Parsec SyntaxError String
+
+---
+-- API
+parseCommands :: FilePath -> String -> Either String [Command]
+parseCommands fp input = bimap errorBundlePretty id
+  $ parse commands fp input
+
+
+---
+-- parser
+commands :: Parser [Command]
+commands = many command <* eof
+
+
+command :: Parser Command
+command = bind <|> someBind <|> eval
+  where
+    eval = Eval () <$> term
+    bind = fail "TBI - bind"
+    someBind = fail "TBI - somebind"
+
 
 typeAtom :: Parser Type
 typeAtom = parens typeP
   <|> allTy
   <|> someTy
   <|> (TyBool <$ symbol "Bool" <?> "Bool type")
-  <|> (TyVar (-1) (-1) <$ tyIdentifier <?> "type variable")
+  <|> (TyVar (-1) (-1) <$> tyIdentifier <?> "type variable")
   where
     allTy = TyAll
       <$> (pKeyword "forall" *> tyIdentifier <* period)
@@ -57,7 +81,7 @@ termAtom = parens term
   -- when this goes wrong we have to backtrack
   <|> try var
   where
-    var = Var () <$> identifier <?> "variable"
+    var = Var () <$> (identifier <?> "variable name") <*> pure (-1) <*> pure (-1)
     abs = Abs ()
       <$> (pKeyword "lambda" *> identifier <* colon)
       <*> typeP <* period
@@ -85,24 +109,24 @@ term = makeExprParser termAtom table
 
 ---
 -- auxiliary definitions
-keywords :: Set Text
+keywords :: Set String
 keywords = S.fromList ["lambda", "in", "let", "as"]
 
-identifier :: Parser Text
+identifier :: Parser String
 identifier = do
-  iden <- T.cons <$> letterChar <*> alphanum
+  iden <- (:) <$> letterChar <*> alphanum
   if iden `S.member` keywords
-    then keywordAsVariable $ T.unpack iden
+    then keywordAsVariable iden
     else return iden
 
 keywordAsVariable :: String -> Parser a
 keywordAsVariable = customFailure . KeywordAsVariable
 
-alphanum :: Parser Text
+alphanum :: Parser String
 alphanum = lexeme $ takeWhileP Nothing isAlphaNum
 
-tyIdentifier :: Parser Text
-tyIdentifier = T.cons <$> upperChar <*> option "" alphanum
+tyIdentifier :: Parser String
+tyIdentifier = (:) <$> upperChar <*> option "" alphanum
 
 sc :: Parser ()
 sc = L.space
@@ -113,13 +137,13 @@ sc = L.space
 lexeme :: Parser a -> Parser a
 lexeme = L.lexeme sc
 
-symbol :: Text -> Parser Text
+symbol :: String -> Parser String
 symbol = L.symbol sc
 
-pKeyword :: Text -> Parser ()
+pKeyword :: String -> Parser ()
 pKeyword keyword = void $ lexeme (string keyword <* notFollowedBy alphaNumChar)
 
-pair :: (Text, Text) -> Parser b -> Parser b
+pair :: (String, String) -> Parser b -> Parser b
 pair (beg, end) = between (symbol beg) (symbol end)
 
 parens :: Parser a -> Parser a

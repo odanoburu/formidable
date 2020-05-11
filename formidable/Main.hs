@@ -1,5 +1,9 @@
 module Main where
 
+
+import F.Lib (processFile)
+
+
 import Data.Char (isSpace)
 import Options.Applicative
 import System.Console.Haskeline (InputT, defaultSettings, getInputLine
@@ -57,7 +61,7 @@ runREPL _ = runInputT defaultSettings loop
       case splitAt 1 . dropWhile isSpace <$> minput of
         Just (":", metaCommand) -> handleMetaCommand metaCommand
         Just (_, "") -> loop
-        Just (_x, _xs) -> undefined
+        Just (_x, _xs) -> error "TBI - repl"
         --   let mStatement = prepareStatement $ x ++ xs
         --   t' <- either (\msg -> outputStrLn msg >> return t)
         --                (\st -> liftIO (executeStatement t st)
@@ -71,7 +75,6 @@ runREPL _ = runInputT defaultSettings loop
           handleMetaCommand _ = outputStrLn "Unrecognized command" *> loop
 
 
-
 main :: IO ()
 main = do
   (CLI importDirs' subcommand) <- showHelpOnErrorExecParser
@@ -81,6 +84,4 @@ main = do
   importDirs <- mapM canonicalizePath importDirs'
   case subcommand of
     REPL -> runREPL importDirs
-    Eval f -> evalFile f
-  where
-    evalFile = undefined
+    Eval f -> (show <$> processFile f) >>= putStrLn

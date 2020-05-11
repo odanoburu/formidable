@@ -30,6 +30,7 @@ dependencies:
 - base >= 4.7 && < 5
 - containers == 0.6.*
 - megaparsec == 7.*
+- mtl == 2.2.*
 - parser-combinators == 1.*
 - text == 1.2.*
 
