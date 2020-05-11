@@ -37,15 +37,19 @@ library:
   source-dirs: src
 
 executables:
-  formidable-exe:
+  formidable:
     main:                Main.hs
-    source-dirs:         app
+    source-dirs:         formidable
     ghc-options:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
     - formidable
+    - optparse-applicative == 0.14.*
+    - directory == 1.*
+    - filepath == 1.4.*
+    - haskeline == 0.7.*
 
 tests:
   formidable-test:
