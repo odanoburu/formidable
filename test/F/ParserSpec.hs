@@ -63,3 +63,12 @@ spec = describe "parsing" $ do
     "lambda x:exists X, X. x" `termParsesAs`
     Abs () "x" (TySome "X" $ TyVar (-1) (-1) "X") (Var () "x" (-1) (-1))
 
+  -- add-ons
+  it "parses boolean true" $
+    "#t" `termParsesAs` TTrue ()
+
+  it "parses boolean false" $
+    "#f" `termParsesAs` TFalse ()
+
+  it "parses if conditionals" $
+    "if #t then #f else #t" `termParsesAs` TIf () (TTrue ()) (TFalse ()) (TTrue ())

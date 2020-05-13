@@ -38,6 +38,7 @@ data Type
 
 
 data Term
+-- pure LC
   = Var Info String Int Int               -- variable
   | Abs Info String Type Term             -- abstraction
   | App Info Term Term                    -- application
@@ -46,6 +47,10 @@ data Term
   | TApp Info Term Type                   -- type application
   | TPack Info Type Term Type             -- packing
   | TUnpack Info String String Term Term  -- unpacking
+-- add-ons
+  | TTrue Info
+  | TFalse Info
+  | TIf Info Term Term Term
   deriving (Eq, Show)
 
 
@@ -134,6 +139,9 @@ tmmap onVar onType = go
       TPack fi (onType c tyT1) (go c t2) (onType c tyT3)
     go c (TUnpack fi tyX x t1 t2) =
       TUnpack fi tyX x (go c t1) (go (c+2) t2)
+    go _ (TTrue fi) = TTrue fi
+    go _ (TFalse fi) = TFalse fi
+    go c (TIf fi tcond tt tf) = TIf fi (go c tcond) (go c tt) (go c tf)
 
 
 termShiftAbove :: Int -> Int -> Term -> Term

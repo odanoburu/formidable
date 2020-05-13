@@ -1,5 +1,5 @@
 {-# LANGUAGE StrictData #-}
-module F.Parser (parseCommands) where
+module F.Parser (parseCommands, term) where
 
 
 import F.Syntax ( Command(..), Term(..), Type(..))
@@ -13,7 +13,7 @@ import Data.Set (Set)
 import qualified Data.Set as S
 import Prelude hiding (abs)
 import Text.Megaparsec hiding (State)
-import Text.Megaparsec.Char
+import Text.Megaparsec.Char (alphaNumChar, letterChar, space1, string, upperChar)
 --import Text.Megaparsec.Debug (dbg)
 import qualified Text.Megaparsec.Char.Lexer as L
 
@@ -39,7 +39,7 @@ parseCommands fp input = bimap errorBundlePretty id
 ---
 -- parser
 commands :: Parser [Command]
-commands = many command <* eof
+commands = sc *> sepEndBy command semicolon <* eof
 
 
 command :: Parser Command
@@ -80,6 +80,9 @@ termAtom = parens term
   -- 'try' because we may try to parse keywords as variable names, and
   -- when this goes wrong we have to backtrack
   <|> try var
+  -- add-ons
+  <|> bool
+  <|> tIf
   where
     var = Var () <$> (identifier <?> "variable name") <*> pure (-1) <*> pure (-1)
     abs = Abs ()
@@ -98,6 +101,11 @@ termAtom = parens term
       <*> (comma *> identifier <* symbol "}")
       <*> (symbol "=" *> term <* pKeyword "in")
       <*> term
+    bool = TTrue () <$ symbol "#t" <|> TFalse () <$ symbol "#f"
+    tIf = TIf ()
+      <$> (pKeyword "if" *> term)
+      <*> (pKeyword "then" *> term)
+      <*> (pKeyword "else" *> term)
 
 
 term :: Parser Term
@@ -110,7 +118,7 @@ term = makeExprParser termAtom table
 ---
 -- auxiliary definitions
 keywords :: Set String
-keywords = S.fromList ["lambda", "in", "let", "as"]
+keywords = S.fromList ["lambda", "in", "let", "as", "if", "then", "else"]
 
 identifier :: Parser String
 identifier = do
@@ -152,8 +160,8 @@ parens = pair ("(", ")")
 brackets :: Parser a -> Parser a
 brackets = pair ("[", "]")
 
-comma, period, colon :: Parser ()
+comma, period, colon, semicolon :: Parser ()
 comma = void $ symbol ","
 period = void $ symbol "."
 colon = void $ symbol ":"
-
+semicolon = void $ symbol ";"

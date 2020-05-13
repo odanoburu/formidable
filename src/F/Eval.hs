@@ -12,18 +12,23 @@ import F.Syntax (Type(..), Term(..), Binding(..), Context(..),
 
 
 isVal :: Context -> Term -> Bool
-isVal _ Abs{} = True
-isVal _ TAbs{} = True
+isVal _ Abs{}    = True
+isVal _ TAbs{}   = True
+isVal _ TTrue{}  = True
+isVal _ TFalse{} = True
 isVal _ _ = False
 
 eval1 :: Context -> Term -> Maybe Term
 eval1 ctx = go
   where
+    go Var{} = Nothing
+    go Abs{} = Nothing
     go (App _fi (Abs __fi _x _tyT11 t12) v2)
       | isVal ctx v2 = Just $ termSubstTop v2 t12
     go (App fi v1 t2)
       | isVal ctx v1 = eval1 ctx t2 >>= Just . App fi v1
     go (App fi t1 t2) = eval1 ctx t1 >>= \t1' -> Just $ App fi t1' t2
+    go TAbs{} = Nothing
     go (TApp _fi (TAbs __fi _x t11) tyT2) =
       Just $ tytermSubstTop tyT2 t11
     go (TApp fi t1 tyT2) = eval1 ctx t1 >>= \t1' -> Just $ TApp fi t1' tyT2
@@ -34,13 +39,16 @@ eval1 ctx = go
       eval1 ctx t1 >>= \t1' -> Just $ TUnpack fi tyX x t1' t2
     go (TPack fi tyT1 t2 tyT3) = eval1 ctx t2
       >>= \t2' -> Just $ TPack fi tyT1 t2' tyT3
-    go _ = Nothing
+    go TTrue{} = Nothing
+    go TFalse{} = Nothing
+    go (TIf _ TTrue{} tt _) = Just tt
+    go (TIf _ TFalse{} _ tf) = Just tf
+    go (TIf fi tcond tt tf) =
+      eval1 ctx tcond >>= \tcond' -> Just $ TIf fi tcond' tt tf
 
 
 eval :: Context -> Term -> Term
-eval ctx t = case eval1 ctx t of
-  Just t' -> eval ctx t'
-  Nothing -> t
+eval ctx = rewrite (eval1 ctx)
 
 
 ---
@@ -87,4 +95,36 @@ typeOf ctx = go
               tyT2  = typeOf ctx'' t2
           in typeShift (-2) tyT2
         _ -> showError fi "existential type expected"
+    go (TTrue _)  = TyBool
+    go (TFalse _) = TyBool
+    go (TIf fi tcond tt tf) =
+      if typeOf ctx tcond == TyBool
+      then let tytt = typeOf ctx tt
+           in if tytt == typeOf ctx tf
+              then tytt
+              else showError fi
+                             "arms of conditional have different types*IMPROVEMSG*"
+      else showError fi "conditional guard is not a boolean"
 
+
+-- typeEq :: Context -> Type -> Type -> Bool
+-- typeEq ctx ty1 ty2 =
+--   case (ty1', ty2') of
+--     (TyBool, TyBool) -> True
+--   where
+--     ty1' = simplifyType ctx ty1
+--     ty2' = simplifyType ctx ty2
+
+
+-- simplifyType :: Context -> Type -> Type
+-- simplifyType ctx = rewrite (computeType ctx)
+--   where
+--     -- TODO: implement when tyAbbBind is implemented
+--     computeType _ TyVar{} = Nothing
+--     computeType _ _ = Nothing
+
+
+rewrite :: (a -> Maybe a) -> a -> a
+rewrite f x = case f x of
+  Just x' -> rewrite f x'
+  Nothing -> x
