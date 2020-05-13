@@ -1,4 +1,4 @@
-module F.Decor where
+module F.Decor (contextualize) where
 
 
 import F.Syntax ( Command(..), Term(..), Type(..), Context(..), TopLevel(..)
@@ -13,52 +13,50 @@ contextualize = foldr go mempty
   where
     go cmd (TopLevel ctx cmds) =
       case cmd of
-        Eval fi t -> let (ctx', t') = decor ctx t
+        Eval fi t -> let (t', ctx') = decor t ctx
                      in TopLevel ctx' $ Eval fi t' : cmds
         _ -> error "TBI - contextualize"
 
 
-(.>) :: (a -> b) -> (c, a) -> (c, b)
--- | fill in term\/type with hole with term\/type in the pair and
--- return it
-t_ .> (ctx, t') = (ctx, t_ t')
+infixl 4 .<
+(.<) :: (a -> b, c) -> (c -> (a, c)) -> (b, c)
+(t_, ctx) .< t' = let (a, ctx') = t' ctx in (t_ a, ctx')
 
 
-decor :: Context -> Term -> (Context, Term)
-decor ctx@(Ctx _ (Sum n)) (Var fi vn _ _) =
+
+decor :: Term -> Context -> (Term, Context)
+decor (Var fi vn _ _) ctx@(Ctx _ (Sum n)) =
   let mvi = nameToIndex fi ctx vn
   in maybe (error "Unbound identifier*IMPROVEMSG*")
-           (\vi -> (ctx, Var fi vn vi n))
+           (\vi -> (Var fi vn vi n, ctx))
            mvi
-decor ctx (Abs fi vn ty t) =
-  let ctx' = ctx `addName` vn
-  in Abs fi vn ty .> decor ctx' t
-decor ctx (App fi t1 t2) =
-  let (ctx', t1') = decor ctx t1
-  in App fi t1' .> decor ctx' t2
-decor ctx (TAbs fi tn t) =
-  let ctx' = ctx `addName` tn
-  in TAbs fi tn .> decor ctx' t
-decor ctx (TApp fi t ty) =
-  let (ctx', t') = decor ctx t
-  in TApp fi t' .> decorT ctx' ty
-decor _ TPack{} = error "decor tpack"
-decor _ TUnpack{} = error "decor tunpack"
+decor (Abs fi vn ty t) ctx =
+  (Abs fi vn ty, ctx `addName` vn) .< decor t
+decor (App fi t1 t2) ctx =
+  (App fi, ctx) .< decor t1 .< decor t2
+decor (TAbs fi tn t) ctx =
+  (TAbs fi tn, ctx `addName` tn) .< decor t
+decor (TApp fi t ty) ctx =
+  (TApp fi, ctx) .< decor t .< decorT ty
+decor TPack{} _ = error "decor tpack"
+decor TUnpack{} _ = error "decor tunpack"
+-- add-ons
+decor (TTrue fi) ctx = (TTrue fi, ctx)
+decor (TFalse fi) ctx = (TFalse fi, ctx)
+decor (TIf fi tcond tt tf) ctx =
+  (TIf fi, ctx) .< decor tcond .< decor tt .< decor tf
 
 
-decorT :: Context -> Type -> (Context, Type)
-decorT ctx TyBool = (ctx, TyBool)
-decorT _ (TyId _) = error "decorT tyid"
-decorT ctx@(Ctx _ (Sum n)) (TyVar _ _ tvn) =
-  (ctx, ) $ case nameToIndex () ctx tvn of
+decorT :: Type -> Context -> (Type, Context)
+decorT TyBool ctx = (TyBool, ctx)
+decorT (TyId _) _ = error "decorT tyid"
+decorT (TyVar _ _ tvn) ctx@(Ctx _ (Sum n)) =
+  (, ctx) $ case nameToIndex () ctx tvn of
     Just tvi -> TyVar tvi n tvn
     Nothing -> TyId tvn
-decorT ctx (TyArr t1 t2) =
-  let (ctx', t1') = decorT ctx t1
-  in TyArr t1' .> decorT ctx' t2
-decorT ctx (TyAll tvn ty) =
-  let ctx' = ctx `addName` tvn
-  in TyAll tvn .> decorT ctx' ty
-decorT ctx (TySome tvn ty) =
-  let ctx' = ctx `addName` tvn
-  in TySome tvn .> decorT ctx' ty
+decorT (TyArr t1 t2) ctx =
+  (TyArr, ctx) .< decorT t1 .< decorT t2
+decorT (TyAll tvn ty) ctx =
+  (TyAll tvn, ctx `addName` tvn) .< decorT ty
+decorT (TySome tvn ty) ctx =
+  (TySome tvn, ctx `addName` tvn) .< decorT ty
