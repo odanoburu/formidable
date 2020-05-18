@@ -3,6 +3,7 @@ module F.Syntax (
   Command(..), Info(..), Type(..), Term(..), Binding(..), Context(..),
   TopLevel(..),
   addName,
+  makeContext,
   termSubstTop,
   tytermSubstTop,
   typeSubstTop,
@@ -66,7 +67,9 @@ data Binding
 
 
 data Context = Ctx [(String, Binding)] (Sum Int)
-  deriving (Show)
+
+instance Show Context where
+  show (Ctx bs _) = show bs
 
 instance Semigroup Context where
   Ctx ctx n <> Ctx ctx' n' = Ctx (ctx <> ctx') (n <> n')
@@ -130,11 +133,11 @@ typeSubstTop :: Type -> Type -> Type
 typeSubstTop tyS tyT = typeShift (-1) (typeSubst (typeShift 1 tyS) 0 tyT)
 
 
-tmmap :: (Info -> Int -> Int -> Int -> Term) -> (Int -> Type -> Type)
+tmmap :: (Info -> Int -> Int -> Int -> (String -> Term)) -> (Int -> Type -> Type)
   -> Int -> Term -> Term
 tmmap onVar onType = go
   where
-    go c (Var fi _ x n) = onVar fi c x n
+    go c (Var fi vn x n) = onVar fi c x n vn
     go c (Abs fi x tyT1 t2) = Abs fi x (onType c tyT1) $ go (c+1) t2
     go c (App fi t1 t2) = App fi (go c t1) (go c t2)
     go c (TAbs fi tyX t2) = TAbs fi tyX $ go (c+1) t2
@@ -151,7 +154,7 @@ tmmap onVar onType = go
 termShiftAbove :: Int -> Int -> Term -> Term
 termShiftAbove d = tmmap onVar onType
   where
-    onVar fi c x n = if x >= c then Var fi "" (x+d) (n+d) else Var fi "" x (n+d)
+    onVar fi c x n = if x >= c then \vn -> Var fi vn (x+d) (n+d) else \vn -> Var fi vn x (n+d)
     onType = typeShiftAbove d
 
 
@@ -162,14 +165,14 @@ termShift d = termShiftAbove d 0
 termSubst :: Int -> Term -> Term -> Term
 termSubst j' s = tmmap onVar onType j'
   where
-    onVar fi j x n = if x == j then termShift j s else Var fi "" x n
+    onVar fi j x n vn = if x == j then termShift j s else Var fi vn x n
     onType _ tyT = tyT
 
 
 tytermSubst :: Type -> Int -> Term -> Term
 tytermSubst tyS = tmmap onVar onType
   where
-    onVar fi _c = Var fi ""
+    onVar fi _c i n vn = Var fi vn i n
     onType = typeSubst tyS
 
 
@@ -182,6 +185,10 @@ tytermSubstTop tyS t = termShift (-1) $ tytermSubst (typeShift 1 tyS) 0 t
 
 ---
 -- context
+makeContext :: [(String, Binding)] -> Context
+makeContext bs = Ctx bs (Sum $ length bs)
+
+
 addBinding :: Context -> String -> Binding -> Context
 addBinding (Ctx ctx n) x bind = Ctx ((x,bind):ctx) (n+1)
 

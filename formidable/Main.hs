@@ -1,9 +1,12 @@
 module Main where
 
 
-import F.Lib (processFile)
+import F.Lib (processFile, processCommands)
+import F.Eval (InContext(..))
+import F.Parser (parseCommands)
+import F.Syntax (Context(..))
 
-
+import Control.Monad.IO.Class (liftIO)
 import Data.Char (isSpace)
 import Options.Applicative
 import System.Console.Haskeline (InputT, defaultSettings, getInputLine
@@ -53,26 +56,30 @@ cliHeader :: String
 cliHeader = "formidable — system F interpreter."
 
 runREPL :: [FilePath] -> IO ()
-runREPL _ = runInputT defaultSettings loop
+runREPL _ = runInputT defaultSettings (loop mempty)
   where
-    loop :: InputT IO ()
-    loop = do
+    loop :: Context -> InputT IO ()
+    loop ctx = do
       minput <- getInputLine "formidable> "
       case splitAt 1 . dropWhile isSpace <$> minput of
         Just (":", metaCommand) -> handleMetaCommand metaCommand
-        Just (_, "") -> loop
-        Just (_x, _xs) -> error "TBI - repl"
-        --   let mStatement = prepareStatement $ x ++ xs
-        --   t' <- either (\msg -> outputStrLn msg >> return t)
-        --                (\st -> liftIO (executeStatement t st)
-        --                  <* outputStrLn "Executed.")
-        --                mStatement
-        --   loop t'
+        Just ("", "") -> loop ctx
+        Just (x, xs) ->
+          let input = x ++ xs
+          in do
+            let parseRes = parseCommands "*REPL*" input
+            case parseRes of
+              Right cmds -> do
+                (_ `InCtx` ctx') <- liftIO $ processCommands ctx cmds
+                loop ctx'
+              Left err -> outputStrLn err *> loop ctx
+            return ()
         Nothing -> return () -- control-D and stuff
         where
           handleMetaCommand "exit" = return ()
           handleMetaCommand "quit" = return ()
-          handleMetaCommand _ = outputStrLn "Unrecognized command" *> loop
+          handleMetaCommand "context" = outputStrLn (show ctx) *> loop ctx
+          handleMetaCommand _ = outputStrLn "Unrecognized command" *> loop ctx
 
 
 main :: IO ()
@@ -84,4 +91,4 @@ main = do
   importDirs <- mapM canonicalizePath importDirs'
   case subcommand of
     REPL -> runREPL importDirs
-    Eval f -> (show <$> processFile f mempty) >>= putStrLn
+    Eval f -> (fmap show <$> processFile f mempty) >>= putStrLn . thing

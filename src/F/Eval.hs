@@ -2,6 +2,7 @@
 module F.Eval
   (
     InContext(..),
+    decor,
     eval,
     eval1,
     evalBinding,
@@ -13,7 +14,12 @@ import F.Syntax (Type(..), Term(..), Binding(..), Context(..),
                  termShift, termSubstTop, tytermSubstTop,
                  typeShift, typeSubstTop,
                  showError)
-import F.Decor (decor)
+import F.Decor (decor')
+
+decor :: Term -> Context -> InContext Term
+decor t ctx =
+  let (t', ctx') = decor' t ctx
+  in t' `InCtx` ctx'
 
 
 isVal :: Context -> Term -> Bool
@@ -161,7 +167,7 @@ evalBinding ctx = go
     go b@VarBind{} = Right $ b `InCtx` ctx
     go b@TyVarBind = Right $ b `InCtx` ctx
     go (TermBind t mTyT) =
-      let (t', ctx') = decor t ctx
+      let (t' `InCtx` ctx') = decor t ctx
           tyT' = typeOf ctx' t'
           t'' = eval ctx' t'
       in if maybe True (typeEqv ctx tyT') mTyT
@@ -173,13 +179,22 @@ evalBinding ctx = go
 
 
 --- printing
-data InContext a = InCtx a Context
+data InContext a = InCtx {thing :: a, context :: Context}
 
 instance Show (InContext Binding) where
   show (b `InCtx` ctx) = showBinding ctx b
 
 instance Show (InContext Type) where
   show (ty `InCtx` ctx) = showType ctx ty
+
+instance Functor InContext where
+  fmap f (a `InCtx` ctx) = f a `InCtx` ctx
+
+instance Semigroup a => Semigroup (InContext a) where
+  (a `InCtx` ctx) <> (a' `InCtx` ctx') = (a <> a') `InCtx` (ctx <> ctx')
+
+instance Monoid a => Monoid (InContext a) where
+  mempty = mempty `InCtx` mempty
 
 
 showBinding :: Context -> Binding -> String
