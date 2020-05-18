@@ -1,27 +1,16 @@
-module F.Decor (contextualize) where
+module F.Decor (decor) where
 
 
-import F.Syntax ( Command(..), Term(..), Type(..), Context(..), TopLevel(..)
+import F.Syntax ( Term(..), Type(..), Context(..)
                 , addName, nameToIndex )
 
 
 import Data.Semigroup (Sum(..))
 
 
-contextualize :: [Command] -> TopLevel
-contextualize = foldr go mempty
-  where
-    go cmd (TopLevel ctx cmds) =
-      case cmd of
-        Eval fi t -> let (t', ctx') = decor t ctx
-                     in TopLevel ctx' $ Eval fi t' : cmds
-        _ -> error "TBI - contextualize"
-
-
 infixl 4 .<
 (.<) :: (a -> b, c) -> (c -> (a, c)) -> (b, c)
 (t_, ctx) .< t' = let (a, ctx') = t' ctx in (t_ a, ctx')
-
 
 
 decor :: Term -> Context -> (Term, Context)

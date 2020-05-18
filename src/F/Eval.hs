@@ -1,14 +1,19 @@
+{-# LANGUAGE FlexibleInstances #-}
 module F.Eval
   (
-    typeOf,
+    InContext(..),
+    checkBinding,
     eval,
+    evalBinding,
+    typeOf,
     ) where
 
 import F.Syntax (Type(..), Term(..), Binding(..), Context(..),
-                 addBinding, getTypeFromContext,
+                 addBinding, addName, getTypeFromContext,
                  termShift, termSubstTop, tytermSubstTop,
                  typeShift, typeSubstTop,
                  showError)
+import F.Decor (decor)
 
 
 isVal :: Context -> Term -> Bool
@@ -100,31 +105,96 @@ typeOf ctx = go
     go (TIf fi tcond tt tf) =
       if typeOf ctx tcond == TyBool
       then let tytt = typeOf ctx tt
-           in if tytt == typeOf ctx tf
+           in if typeEqv ctx tytt $ typeOf ctx tf
               then tytt
               else showError fi
                              "arms of conditional have different types*IMPROVEMSG*"
       else showError fi "conditional guard is not a boolean"
 
 
--- typeEq :: Context -> Type -> Type -> Bool
--- typeEq ctx ty1 ty2 =
---   case (ty1', ty2') of
---     (TyBool, TyBool) -> True
---   where
---     ty1' = simplifyType ctx ty1
---     ty2' = simplifyType ctx ty2
+typeEqv :: Context -> Type -> Type -> Bool
+typeEqv ctx ty1 ty2 = go ty1' ty2'
+  where
+    go TyBool TyBool = True
+    go (TyId b1) (TyId b2) = b1 == b2
+    -- TODO: when type abscription we need to change this
+    go (TyVar i _ _) (TyVar j _ _) = i == j
+    go (TyArr ty11 ty12) (TyArr ty21 ty22)
+      = typeEqv ctx ty11 ty21 && typeEqv ctx ty12 ty22
+    go (TySome tyX ty11) (TySome _ ty21) = highOrdEqv tyX ty11 ty21
+    go (TyAll tyX ty11) (TyAll _ ty21) = highOrdEqv tyX ty11 ty21
+    go TyBool _ = False
+    go _ TyBool = False
+    go TyId{} _ = False
+    go _ TyId{} = False
+    go TyArr{} _ = False
+    go _ TyArr{} = False
+    go TySome{} _ = False
+    go _ TySome{} = False
+    go _ TyAll{} = False
+    go TyAll{} _ = False
+    highOrdEqv tyX = typeEqv (addName ctx tyX)
+    ty1' = simplifyType ctx ty1
+    ty2' = simplifyType ctx ty2
 
 
--- simplifyType :: Context -> Type -> Type
--- simplifyType ctx = rewrite (computeType ctx)
---   where
---     -- TODO: implement when tyAbbBind is implemented
---     computeType _ TyVar{} = Nothing
---     computeType _ _ = Nothing
+simplifyType :: Context -> Type -> Type
+simplifyType ctx = rewrite (computeType ctx)
+  where
+    -- TODO: implement when tyAbbBind is implemented
+    computeType _ TyVar{} = Nothing
+    computeType _ _ = Nothing
 
 
 rewrite :: (a -> Maybe a) -> a -> a
 rewrite f x = case f x of
   Just x' -> rewrite f x'
   Nothing -> x
+
+
+checkBinding :: Context -> Binding -> Either String Binding
+checkBinding ctx = go
+  where
+    go b@NameBind = Right b
+    go b@VarBind{} = Right b
+    go b@TyVarBind = Right b
+    go (TermBind t Nothing) =
+      Right . TermBind t . Just $ typeOf ctx t
+    go b@(TermBind t (Just tyT)) =
+      let tyT' = typeOf ctx t
+      in if typeEqv ctx tyT' tyT
+      then Right b
+      else Left "Type of binding does not match declared type"
+
+
+evalBinding :: Context -> Binding -> Binding
+evalBinding ctx (TermBind t mTyT)
+  = let (t', ctx') = decor t ctx
+        t'' = eval ctx' t'
+    in TermBind t'' mTyT
+evalBinding _ b = b
+
+--- printing
+data InContext a = InCtx a Context
+
+instance Show (InContext Binding) where
+  show (b `InCtx` ctx) = showBinding ctx b
+
+instance Show (InContext Type) where
+  show (ty `InCtx` ctx) = showType ctx ty
+
+
+showBinding :: Context -> Binding -> String
+showBinding ctx = go
+  where
+    go NameBind = ""
+    go TyVarBind = ""
+    go (VarBind tyT) = unwords [":", showType ctx tyT]
+    go (TermBind t mTyT)
+      = unwords [":",
+                 case mTyT of
+                   Nothing -> show $ typeOf ctx t `InCtx` ctx
+                   Just tyT -> show $ tyT `InCtx` ctx]
+
+showType :: Context -> Type -> String
+showType _ = show -- FIXME: 

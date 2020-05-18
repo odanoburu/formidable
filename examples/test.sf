@@ -2,4 +2,6 @@ lambda x:Bool. x ;  // lambda
 
 if #t then #t else #f ;  // conditional
 
-(lambda x:Bool. if x then #f else #t) #f ;
+f = lambda x:Bool. if x then #f else #t;
+
+f #f ;

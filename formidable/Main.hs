@@ -84,4 +84,4 @@ main = do
   importDirs <- mapM canonicalizePath importDirs'
   case subcommand of
     REPL -> runREPL importDirs
-    Eval f -> (show <$> processFile f) >>= putStrLn
+    Eval f -> (show <$> processFile f mempty) >>= putStrLn

@@ -2,7 +2,7 @@
 module F.Parser (parseCommands, term) where
 
 
-import F.Syntax ( Command(..), Term(..), Type(..))
+import F.Syntax ( Binding(..), Command(..), Term(..), Type(..))
 
 
 import Control.Monad (void)
@@ -43,10 +43,14 @@ commands = sc *> sepEndBy command semicolon <* eof
 
 
 command :: Parser Command
-command = bind <|> someBind <|> eval
+command = try bind <|> someBind <|> eval
   where
     eval = Eval () <$> term
-    bind = fail "TBI - bind"
+    bind = Bind () <$> varIdentifier <*> (varBind <|> termBind)
+      <|> Bind () <$> tyIdentifier <*> error "TBI - typeBind"
+      where
+        varBind = VarBind <$> (colon *> typeP)
+        termBind = TermBind <$> (equal *> term) <*> pure Nothing
     someBind = fail "TBI - somebind"
 
 
@@ -84,9 +88,9 @@ termAtom = parens term
   <|> bool
   <|> tIf
   where
-    var = Var () <$> (identifier <?> "variable name") <*> pure (-1) <*> pure (-1)
+    var = Var () <$> varIdentifier <*> pure (-1) <*> pure (-1)
     abs = Abs ()
-      <$> (pKeyword "lambda" *> identifier <* colon)
+      <$> (pKeyword "lambda" *> varIdentifier <* colon)
       <*> typeP <* period
       <*> term <?> "lambda abstraction"
     tAbs = TAbs ()
@@ -98,7 +102,7 @@ termAtom = parens term
       <*> (pKeyword "as" *> typeP)
     tUnpack = TUnpack ()
       <$> (pKeyword "let" *> symbol "{" *> tyIdentifier)
-      <*> (comma *> identifier <* symbol "}")
+      <*> (comma *> varIdentifier <* symbol "}")
       <*> (symbol "=" *> term <* pKeyword "in")
       <*> term
     bool = TTrue () <$ symbol "#t" <|> TFalse () <$ symbol "#f"
@@ -120,12 +124,12 @@ term = makeExprParser termAtom table
 keywords :: Set String
 keywords = S.fromList ["lambda", "in", "let", "as", "if", "then", "else"]
 
-identifier :: Parser String
-identifier = do
-  iden <- (:) <$> letterChar <*> alphanum
-  if iden `S.member` keywords
-    then keywordAsVariable iden
-    else return iden
+varIdentifier :: Parser String
+varIdentifier = do
+  vn <- (:) <$> letterChar <*> alphanum <?> "variable name"
+  if vn `S.member` keywords
+    then keywordAsVariable vn
+    else return vn
 
 keywordAsVariable :: String -> Parser a
 keywordAsVariable = customFailure . KeywordAsVariable
@@ -134,7 +138,7 @@ alphanum :: Parser String
 alphanum = lexeme $ takeWhileP Nothing isAlphaNum
 
 tyIdentifier :: Parser String
-tyIdentifier = (:) <$> upperChar <*> option "" alphanum
+tyIdentifier = (:) <$> upperChar <*> option "" alphanum <?> "type variable name"
 
 sc :: Parser ()
 sc = L.space
@@ -160,8 +164,9 @@ parens = pair ("(", ")")
 brackets :: Parser a -> Parser a
 brackets = pair ("[", "]")
 
-comma, period, colon, semicolon :: Parser ()
+comma, equal, period, colon, semicolon :: Parser ()
 comma = void $ symbol ","
+equal = void $ symbol "="
 period = void $ symbol "."
 colon = void $ symbol ":"
 semicolon = void $ symbol ";"

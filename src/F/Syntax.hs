@@ -58,6 +58,7 @@ data Binding
   = NameBind
   | VarBind Type
   | TyVarBind
+  | TermBind Term (Maybe Type)
   deriving (Show)
 
 
@@ -193,6 +194,8 @@ bindingShift :: Int -> Binding -> Binding
 bindingShift _ NameBind = NameBind
 bindingShift d (VarBind tyT) = VarBind $ typeShift d tyT
 bindingShift _ TyVarBind = TyVarBind
+bindingShift d (TermBind t mTy)
+  = TermBind (termShift d t) $ fmap (typeShift d) mTy
 
 
 getBinding :: Info -> Context -> Int -> Binding
@@ -205,7 +208,8 @@ getTypeFromContext fi ctx i = case getBinding fi ctx i of
   VarBind tyT -> tyT
   _ ->
     showError fi
-              "getTypeFromContext: Wrong kind of binding for variable*IMPROVEMSG*" 
+              "getTypeFromContext: Wrong kind of binding for variable*IMPROVEMSG*"
+
 
 ---
 -- auxiliary definitions
