@@ -26,8 +26,10 @@ import Prelude hiding ((!!))
 ---
 -- types
 newtype Info = Offset Int
-  deriving (Eq, Show)
+  deriving (Show)
 
+instance Eq Info where
+  _ == _ = True -- we don't care
 
 data Type
   -- primitive

@@ -13,6 +13,12 @@ following [[https://www.cis.upenn.edu/~bcpierce/tapl/][TAPL]] (not strictly thou
    (the first time you run this will probably take some time)
 
 
+* using
+: formidable --help
+
+currently there's a way to evaluate a single file or use a REPL.
+
+
 * testing
 
 you can run the tests with
