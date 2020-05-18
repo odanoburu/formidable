@@ -2,7 +2,7 @@
 module F.Parser (parseCommands, term) where
 
 
-import F.Syntax ( Binding(..), Command(..), Term(..), Type(..))
+import F.Syntax ( Binding(..), Command(..), Info(..), Term(..), Type(..))
 
 
 import Control.Monad (void)
@@ -45,9 +45,9 @@ commands = sc *> sepEndBy command semicolon <* eof
 command :: Parser Command
 command = try bind <|> someBind <|> eval
   where
-    eval = Eval () <$> term
-    bind = Bind () <$> varIdentifier <*> (varBind <|> termBind)
-      <|> Bind () <$> tyIdentifier <*> error "TBI - typeBind"
+    eval = Eval <$> info <*> term
+    bind = Bind <$> info <*> varIdentifier <*> (varBind <|> termBind)
+      <|> Bind <$> info <*> tyIdentifier <*> error "TBI - typeBind"
       where
         varBind = VarBind <$> (colon *> typeP)
         termBind = TermBind <$> (equal *> term) <*> pure Nothing
@@ -88,26 +88,26 @@ termAtom = parens term
   <|> bool
   <|> tIf
   where
-    var = Var () <$> varIdentifier <*> pure (-1) <*> pure (-1)
-    abs = Abs ()
-      <$> (pKeyword "lambda" *> varIdentifier <* colon)
+    var = Var <$> info <*> varIdentifier <*> pure (-1) <*> pure (-1)
+    abs = Abs <$> info
+      <*> (pKeyword "lambda" *> varIdentifier <* colon)
       <*> typeP <* period
       <*> term <?> "lambda abstraction"
-    tAbs = TAbs ()
-      <$> (pKeyword "Lambda" *> tyIdentifier <* period)
+    tAbs = TAbs <$> info
+      <*> (pKeyword "Lambda" *> tyIdentifier <* period)
       <*> term <?> "type abstraction"
-    tPack = TPack ()
-      <$> (symbol "{" *> symbol "*" *> typeP)
+    tPack = TPack <$> info
+      <*> (symbol "{" *> symbol "*" *> typeP)
       <*> (comma *> term <* symbol "}")
       <*> (pKeyword "as" *> typeP)
-    tUnpack = TUnpack ()
-      <$> (pKeyword "let" *> symbol "{" *> tyIdentifier)
+    tUnpack = TUnpack <$> info
+      <*> (pKeyword "let" *> symbol "{" *> tyIdentifier)
       <*> (comma *> varIdentifier <* symbol "}")
       <*> (symbol "=" *> term <* pKeyword "in")
       <*> term
-    bool = TTrue () <$ symbol "#t" <|> TFalse () <$ symbol "#f"
-    tIf = TIf ()
-      <$> (pKeyword "if" *> term)
+    bool = TTrue <$> info <* symbol "#t" <|> TFalse <$> info <* symbol "#f"
+    tIf = TIf <$> info
+      <*> (pKeyword "if" *> term)
       <*> (pKeyword "then" *> term)
       <*> (pKeyword "else" *> term)
 
@@ -115,8 +115,8 @@ termAtom = parens term
 term :: Parser Term
 term = makeExprParser termAtom table
   where
-    table = [ [ InfixL (App () <$ symbol "")
-              , Postfix (flip (TApp ()) <$> brackets typeP) ] ]
+    table = [ [ InfixL (App <$> info <* symbol "")
+              , Postfix ((\i tyT t -> TApp i t tyT) <$> info <*> brackets typeP) ] ]
 
 
 ---
@@ -170,3 +170,6 @@ equal = void $ symbol "="
 period = void $ symbol "."
 colon = void $ symbol ":"
 semicolon = void $ symbol ";"
+
+info :: Parser Info
+info = Offset <$> getOffset

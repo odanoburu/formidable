@@ -1,7 +1,7 @@
 module F.Decor (decor) where
 
 
-import F.Syntax ( Term(..), Type(..), Context(..)
+import F.Syntax ( Context(..), Info(..), Term(..), Type(..)
                 , addName, nameToIndex )
 
 
@@ -40,7 +40,7 @@ decorT :: Type -> Context -> (Type, Context)
 decorT TyBool ctx = (TyBool, ctx)
 decorT (TyId _) _ = error "decorT tyid"
 decorT (TyVar _ _ tvn) ctx@(Ctx _ (Sum n)) =
-  (, ctx) $ case nameToIndex () ctx tvn of
+  (, ctx) $ case nameToIndex (Offset $ -1) ctx tvn of
     Just tvi -> TyVar tvi n tvn
     Nothing -> TyId tvn
 decorT (TyArr t1 t2) ctx =

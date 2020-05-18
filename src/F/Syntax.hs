@@ -1,6 +1,7 @@
 {-# LANGUAGE StrictData #-}
 module F.Syntax (
-  Command(..), Info, Type(..), Term(..), Binding(..), Context(..), TopLevel(..),
+  Command(..), Info(..), Type(..), Term(..), Binding(..), Context(..),
+  TopLevel(..),
   addName,
   termSubstTop,
   tytermSubstTop,
@@ -17,12 +18,14 @@ module F.Syntax (
 
 import Data.List (findIndex)
 import Data.Semigroup (Sum(..))
+--import Debug.Trace (trace)
 import Prelude hiding ((!!))
 
 
 ---
 -- types
-type Info = ()
+newtype Info = Offset Int
+  deriving (Eq, Show)
 
 
 data Type
@@ -199,16 +202,35 @@ bindingShift d (TermBind t mTy)
 
 
 getBinding :: Info -> Context -> Int -> Binding
-getBinding fi (Ctx ctx _) i = case ctx !! i of
+getBinding fi (Ctx ctx (Sum n)) i = case ctx !! i of
   Just (_, bind) -> bindingShift (i+1) bind
-  Nothing -> showError fi "Variable lookup failure*IMPROVEMSG*"
+  Nothing -> variableLookupFailure fi i n
 
 getTypeFromContext :: Info -> Context -> Int -> Type
 getTypeFromContext fi ctx i = case getBinding fi ctx i of
-  VarBind tyT -> tyT
-  _ ->
-    showError fi
-              "getTypeFromContext: Wrong kind of binding for variable*IMPROVEMSG*"
+  NameBind -> bindError
+  (VarBind tyT) -> tyT
+  TyVarBind -> bindError
+  TermBind _ (Just tyT) -> tyT
+  TermBind _ Nothing -> showError fi $
+    "No type for variable " ++ varname
+  where
+    varname = indexToName fi ctx i
+    bindError =
+      showError fi $
+                "getTypeFromContext: Wrong kind of binding for variable "
+                ++ varname
+
+
+indexToName :: Info -> Context -> Int -> String
+indexToName fi (Ctx ctx (Sum n)) i = case ctx !! i of
+  Just (vn, _) -> vn
+  Nothing -> variableLookupFailure fi i n
+
+variableLookupFailure :: Info -> Int -> Int -> a
+variableLookupFailure fi i n = showError fi $
+  unwords ["Variable lookup failure: offset was", show i,
+            ", context size was", show n]
 
 
 ---

@@ -8,7 +8,7 @@ module F.Lib
 import F.Syntax (Command(..), Context(..), addBinding, showError)
 import F.Parser (parseCommands)
 import F.Decor (decor)
-import F.Eval (InContext(..), checkBinding, eval, evalBinding, typeOf)
+import F.Eval (InContext(..), eval, evalBinding, typeOf)
 
 
 import Control.Monad (foldM_)
@@ -24,10 +24,9 @@ processCommand ctx (Eval _ t) = do
   putStrLn $ unwords [show t'', ":", show tyT]
   return ctx
 processCommand ctx (Bind fi x _bind) =
-  case checkBinding ctx _bind of
-    Right bind -> do
-      let bind' = evalBinding ctx bind
-      putStrLn $ unwords [x, ":", show $ bind' `InCtx` ctx]
+  case evalBinding ctx _bind of
+    Right bindInCtx@(bind' `InCtx` _) -> do
+      putStrLn $ unwords [x, ":", show bindInCtx]
       return $ addBinding ctx x bind'
     Left err -> showError fi err
 processCommand _ctx _ = error "TBI - processCommand"

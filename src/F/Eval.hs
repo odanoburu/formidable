@@ -2,14 +2,14 @@
 module F.Eval
   (
     InContext(..),
-    checkBinding,
     eval,
+    eval1,
     evalBinding,
     typeOf,
     ) where
 
 import F.Syntax (Type(..), Term(..), Binding(..), Context(..),
-                 addBinding, addName, getTypeFromContext,
+                 addBinding, addName, getBinding, getTypeFromContext,
                  termShift, termSubstTop, tytermSubstTop,
                  typeShift, typeSubstTop,
                  showError)
@@ -26,7 +26,9 @@ isVal _ _ = False
 eval1 :: Context -> Term -> Maybe Term
 eval1 ctx = go
   where
-    go Var{} = Nothing
+    go (Var fi _ i _) = case getBinding fi ctx i of
+      TermBind t _ -> Just t
+      _ -> Nothing
     go Abs{} = Nothing
     go (App _fi (Abs __fi _x _tyT11 t12) v2)
       | isVal ctx v2 = Just $ termSubstTop v2 t12
@@ -152,27 +154,23 @@ rewrite f x = case f x of
   Nothing -> x
 
 
-checkBinding :: Context -> Binding -> Either String Binding
-checkBinding ctx = go
+evalBinding :: Context -> Binding -> Either String (InContext Binding)
+evalBinding ctx = go
   where
-    go b@NameBind = Right b
-    go b@VarBind{} = Right b
-    go b@TyVarBind = Right b
-    go (TermBind t Nothing) =
-      Right . TermBind t . Just $ typeOf ctx t
-    go b@(TermBind t (Just tyT)) =
-      let tyT' = typeOf ctx t
-      in if typeEqv ctx tyT' tyT
-      then Right b
-      else Left "Type of binding does not match declared type"
+    go b@NameBind = Right $ b `InCtx` ctx
+    go b@VarBind{} = Right $ b `InCtx` ctx
+    go b@TyVarBind = Right $ b `InCtx` ctx
+    go (TermBind t mTyT) =
+      let (t', ctx') = decor t ctx
+          tyT' = typeOf ctx' t'
+          t'' = eval ctx' t'
+      in if maybe True (typeEqv ctx tyT') mTyT
+      -- DOUBT: does returning tyT' which is equivalent but not
+      -- necessarily the same as mTyT = Just tyT generate confusing
+      -- error messages?
+         then Right $ TermBind t'' (Just tyT') `InCtx` ctx'
+         else Left "Type of binding does not match declared type"
 
-
-evalBinding :: Context -> Binding -> Binding
-evalBinding ctx (TermBind t mTyT)
-  = let (t', ctx') = decor t ctx
-        t'' = eval ctx' t'
-    in TermBind t'' mTyT
-evalBinding _ b = b
 
 --- printing
 data InContext a = InCtx a Context
@@ -191,10 +189,9 @@ showBinding ctx = go
     go TyVarBind = ""
     go (VarBind tyT) = unwords [":", showType ctx tyT]
     go (TermBind t mTyT)
-      = unwords [":",
-                 case mTyT of
-                   Nothing -> show $ typeOf ctx t `InCtx` ctx
-                   Just tyT -> show $ tyT `InCtx` ctx]
+      = case mTyT of
+          Nothing -> show $ typeOf ctx t `InCtx` ctx
+          Just tyT -> show $ tyT `InCtx` ctx
 
 showType :: Context -> Type -> String
 showType _ = show -- FIXME: 
