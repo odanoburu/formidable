@@ -2,7 +2,7 @@ module F.Decor (decor') where
 
 
 import F.Syntax ( Context(..), Info(..), Term(..), Type(..)
-                , addName, nameToIndex )
+                , addName, nameToIndex, showError )
 
 
 import Data.Semigroup (Sum(..))
@@ -18,7 +18,7 @@ infixl 4 .<
 decor' :: Term -> Context -> (Term, Context)
 decor' (Var fi vn _ _) ctx@(Ctx _ (Sum n)) =
   let mvi = nameToIndex fi ctx vn
-  in maybe (error "Unbound identifier*IMPROVEMSG*")
+  in maybe (showError fi $ unwords ["Unbound identifier", show vn])
            (\vi -> (Var fi vn vi n, ctx))
            mvi
 decor' (Abs fi vn ty t) ctx =
