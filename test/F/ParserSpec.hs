@@ -1,77 +1,108 @@
 module F.ParserSpec (spec) where
 
-import Data.Text (Text)
 import Test.Hspec
 import Text.Megaparsec (parse)
 
 import F.Syntax (Info(..), Term(..), Type(..))
-import F.Parser (term)
+import F.Parser (Parser, pix, term, typeP)
 
 termParsesAs :: String -> Term -> Expectation
-input `termParsesAs` this = parse term "" input `shouldBe` Right this
+input `termParsesAs` this = parsesAs input term this
+
+typeParsesAs :: String -> Type -> Expectation
+input `typeParsesAs` this = parsesAs input typeP this
+
+parsesAs :: (Eq a, Show a) => String -> Parser a -> a -> Expectation
+parsesAs input p this = parse p "" input `shouldBe` Right this
 
 d :: Info
 d = Offset 0
 
 spec :: Spec
 spec = describe "parsing" $ do
-  it "parses lambda" $
-    "lambda x : Bool . x" `termParsesAs` Abs d "x" TyBool (Var d "x" (-1) (-1))
+  termSpec
+  typeSpec
 
-  it "parses lambda with parens" $
-    "(lambda x:Bool . x )" `termParsesAs` Abs d "x" TyBool (Var d "x" (-1) (-1))
+termSpec :: Spec
+termSpec = describe "term" $ do
+  specify "lambda" $
+    "lambda x : Bool . x" `termParsesAs` Abs d "x" TyBool (Var d "x" pix pix)
 
-  it "parses lambda with inline comment" $
-    "lambda x: Bool. x // oi" `termParsesAs` Abs d "x" TyBool (Var d "x" (-1) (-1))
+  specify "lambda with parens" $
+    "(lambda x:Bool . x )" `termParsesAs` Abs d "x" TyBool (Var d "x" pix pix)
 
-  it "parses lambda with block comment" $
-    "lambda x :Bool. /* oi */ x" `termParsesAs` Abs d "x" TyBool (Var d "x" (-1) (-1))
+  specify "lambda with inline comment" $
+    "lambda x: Bool. x // oi" `termParsesAs` Abs d "x" TyBool (Var d "x" pix pix)
 
-  it "parses variable" $
-    "x" `termParsesAs` Var d "x" (-1) (-1)
+  specify "lambda with block comment" $
+    "lambda x :Bool. /* oi */ x" `termParsesAs` Abs d "x" TyBool (Var d "x" pix pix)
 
-  it "parses application" $
+  specify "variable" $
+    "x" `termParsesAs` Var d "x" pix pix
+
+  specify "application" $
     "(lambda y:Bool. y) x" `termParsesAs`
-    App d (Abs d "y" TyBool (Var d "y" (-1) (-1))) (Var d "x" (-1) (-1))
+    App d (Abs d "y" TyBool (Var d "y" pix pix)) (Var d "x" pix pix)
 
-  it "parses type abstraction" $
+  specify "type abstraction" $
     "(Lambda X. y)" `termParsesAs`
-    TAbs d "X" (Var d "y" (-1) (-1))
+    TAbs d "X" (Var d "y" pix pix)
 
-  it "parses type application" $
+  specify "type application" $
     "(lambda y:Bool. y) [X]" `termParsesAs`
-    TApp d (Abs d "y" TyBool (Var d "y" (-1) (-1))) (TyVar (-1) (-1) "X")
+    TApp d (Abs d "y" TyBool (Var d "y" pix pix)) (TyVar pix pix "X")
 
-  it "parses packing" $
+  specify "packing" $
     "{*List, nil} as Stack" `termParsesAs`
-    TPack d (TyVar (-1) (-1) "List") (Var d "nil" (-1) (-1)) (TyVar (-1) (-1) "Stack")
+    TPack d (TyVar pix pix "List") (Var d "nil" pix pix) (TyVar pix pix "Stack")
 
-  it "parses unpacking" $
+  specify "unpacking" $
     "let {Stack, st} = f stackADT in st" `termParsesAs`
-    TUnpack d "Stack" "st" (App d (Var d "f"(-1) (-1)) (Var d "stackADT" (-1) (-1))) (Var d "st" (-1) (-1))
+    TUnpack d "Stack" "st" (App d (Var d "f"pix pix) (Var d "stackADT" pix pix)) (Var d "st" pix pix)
 
   -- types
-  it "parses function types" $
+  specify "function types" $
     "(lambda x:Bool -> Bool. x )" `termParsesAs`
-    Abs d "x" (TyArr TyBool TyBool) (Var d "x" (-1) (-1))
+    Abs d "x" (TyArr TyBool TyBool) (Var d "x" pix pix)
 
-  it "parses type variables" $
-    "lambda x:B. x" `termParsesAs` Abs d "x" (TyVar (-1) (-1) "B") (Var d "x" (-1) (-1))
+  specify "type variables" $
+    "lambda x:B. x" `termParsesAs` Abs d "x" (TyVar pix pix "B") (Var d "x" pix pix)
 
-  it "parses the universal type" $
+  specify "with the universal type" $
     "lambda x:forall X. X. x" `termParsesAs`
-    Abs d "x" (TyAll "X" $ TyVar (-1) (-1) "X") (Var d "x" (-1) (-1))
+    Abs d "x" (TyAll "X" $ TyVar pix pix "X") (Var d "x" pix pix)
 
-  it "parses the existential type" $
+  specify "with the existential type" $
     "lambda x:exists X, X. x" `termParsesAs`
-    Abs d "x" (TySome "X" $ TyVar (-1) (-1) "X") (Var d "x" (-1) (-1))
+    Abs d "x" (TySome "X" $ TyVar pix pix "X") (Var d "x" pix pix)
 
   -- add-ons
-  it "parses boolean true" $
+  specify "boolean true" $
     "#t" `termParsesAs` TTrue d
 
-  it "parses boolean false" $
+  specify "boolean false" $
     "#f" `termParsesAs` TFalse d
 
-  it "parses if conditionals" $
+  specify "if conditionals" $
     "if #t then #f else #t" `termParsesAs` TIf d (TTrue d) (TFalse d) (TTrue d)
+
+
+
+typeSpec :: Spec
+typeSpec = describe "type" $ do
+  specify "variable" $
+    "ATYPE" `typeParsesAs` TyVar pix pix "ATYPE"
+  specify "boolean" $
+    "Bool" `typeParsesAs` TyBool
+
+  specify "universally quantified" $
+    "forall B . B" `typeParsesAs` TyAll "B" (TyVar pix pix "B")
+
+  specify "existentially quantified" $
+    "exists C, C->Bool" `typeParsesAs` TySome "C" (TyArr (TyVar pix pix "C")
+                                                   TyBool)
+
+  specify "arrow type" $
+    "Bool -> A -> Bool" `typeParsesAs` TyArr TyBool (TyArr (TyVar pix pix "A")
+                                                           TyBool)
+

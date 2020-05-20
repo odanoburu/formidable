@@ -1,5 +1,5 @@
 {-# LANGUAGE StrictData #-}
-module F.Parser (parseCommands, term) where
+module F.Parser (Parser, parseCommands, pix, term, typeP) where
 
 
 import F.Syntax ( Binding(..), Command(..), Info(..), Term(..), Type(..))
@@ -59,7 +59,7 @@ typeAtom = parens typeP
   <|> allTy
   <|> someTy
   <|> (TyBool <$ symbol "Bool" <?> "Bool type")
-  <|> (TyVar (-1) (-1) <$> tyIdentifier <?> "type variable")
+  <|> (TyVar pix pix <$> tyIdentifier <?> "type variable")
   where
     allTy = TyAll
       <$> (pKeyword "forall" *> tyIdentifier <* period)
@@ -88,7 +88,7 @@ termAtom = parens term
   <|> bool
   <|> tIf
   where
-    var = Var <$> info <*> varIdentifier <*> pure (-1) <*> pure (-1)
+    var = Var <$> info <*> varIdentifier <*> pure pix <*> pure pix
     abs = Abs <$> info
       <*> (pKeyword "lambda" *> varIdentifier <* colon)
       <*> typeP <* period
@@ -173,3 +173,7 @@ semicolon = void $ symbol ";"
 
 info :: Parser Info
 info = Offset <$> getOffset
+
+pix :: Int
+-- placeholder index
+pix = -1

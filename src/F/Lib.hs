@@ -37,10 +37,8 @@ parseFile fp = parseCommands fp <$> readFile fp
 
 
 processFile :: FilePath -> Context -> IO (InContext [Command])
-processFile fp initCtx = parse
+processFile fp initCtx = parseFile fp
   >>= either (\err -> putStrLn err $> mempty) (processCommands initCtx)
-  where
-    parse = parseFile fp
 
 
 processCommands :: Context -> [Command] -> IO (InContext [Command])
