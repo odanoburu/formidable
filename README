@@ -9,8 +9,11 @@ following [[https://www.cis.upenn.edu/~bcpierce/tapl/][TAPL]] (not strictly thou
 
 1. download [[https://docs.haskellstack.org/en/stable/README/][stack]]
 2. run
-   : stack build --pedantic
-   (the first time you run this will probably take some time)
+   : stack build --pedantic --copy-bins
+   - the first time you run this will probably take some time
+   - with =--copy-bins= the executable =formidable= will be copied to
+     =~/.local/bin= on unixy platforms, make sure it is in your =PATH=
+     variable.
 
 
 * using

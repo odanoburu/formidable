@@ -9,18 +9,29 @@ module F.Eval
     typeOf,
     ) where
 
+
 import F.Syntax (Type(..), Term(..), Binding(..), Context(..),
                  addBinding, addName, getBinding, getTypeFromContext,
                  termShift, termSubstTop, tytermSubstTop,
                  typeShift, typeSubstTop,
                  showError)
-import F.Decor (decor')
+import F.Decor (decor'-- , decorT'
+               )
+
+
+import Debug.Trace (trace)
+
 
 decor :: Term -> Context -> InContext Term
 decor t ctx =
   let (t', ctx') = decor' t ctx
   in t' `InCtx` ctx'
 
+
+-- decorT :: Type -> Context -> InContext Type
+-- decorT ty ctx =
+--   let (ty', ctx') = decorT' ty ctx
+--   in ty' `InCtx` ctx'
 
 isVal :: Context -> Term -> Bool
 isVal _ Abs{}    = True
@@ -79,7 +90,7 @@ typeOf ctx = go
           tyT2 = typeOf ctx t2
       in case tyT1 of
         TyArr tyT11 tyT12 ->
-          if tyT2 == tyT11
+          if typeEqv ctx tyT2 tyT11
           then tyT12
           else showError fi "parameter type mismatch"
         _ -> showError fi "arrow type expected"
@@ -95,7 +106,7 @@ typeOf ctx = go
     go (TPack fi tyT1 t2 tyT@(TySome _tyY tyT2)) =
       let tyU  = typeOf ctx t2
           tyU' = typeSubstTop tyT1 tyT2
-      in if tyU == tyU'
+      in if typeEqv ctx tyU tyU'
          then tyT
          else showError fi "doesn't match declared type"
     go (TPack fi _ _ _) = showError fi "existential type expected"
@@ -111,7 +122,7 @@ typeOf ctx = go
     go (TTrue _)  = TyBool
     go (TFalse _) = TyBool
     go (TIf fi tcond tt tf) =
-      if typeOf ctx tcond == TyBool
+      if typeEqv ctx (typeOf ctx tcond) TyBool
       then let tytt = typeOf ctx tt
            in if typeEqv ctx tytt $ typeOf ctx tf
               then tytt
@@ -121,7 +132,7 @@ typeOf ctx = go
 
 
 typeEqv :: Context -> Type -> Type -> Bool
-typeEqv ctx ty1 ty2 = go ty1' ty2'
+typeEqv ctx ty1 ty2 = go (trace (unwords [show ty1', show ty2', show ctx])ty1') ty2'
   where
     go TyBool TyBool = True
     go (TyId b1) (TyId b2) = b1 == b2
@@ -170,7 +181,7 @@ evalBinding ctx = go
       let (t' `InCtx` ctx') = decor t ctx
           tyT' = typeOf ctx' t'
           t'' = eval ctx' t'
-      in if maybe True (typeEqv ctx tyT') mTyT
+      in if maybe True (typeEqv ctx' tyT') mTyT
       -- DOUBT: does returning tyT' which is equivalent but not
       -- necessarily the same as mTyT = Just tyT generate confusing
       -- error messages?

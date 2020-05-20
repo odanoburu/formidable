@@ -1,17 +1,18 @@
 module Main where
 
 
-import F.Lib (processFile, processCommands)
+import F.Lib (processInput)
 import F.Eval (InContext(..))
 import F.Parser (parseCommands)
 import F.Syntax (Context(..))
 
-import Control.Monad.IO.Class (liftIO)
+--import Control.Monad.IO.Class (liftIO)
 import Data.Char (isSpace)
 import Options.Applicative
 import System.Console.Haskeline (InputT, defaultSettings, getInputLine
                                 , outputStrLn, runInputT)
 import System.Directory (canonicalizePath)
+import System.IO (hPutStrLn, stderr)
 
 
 data CLI = CLI [FilePath] CLIsub
@@ -20,7 +21,11 @@ data CLI = CLI [FilePath] CLIsub
 
 data CLIsub
   = REPL
-  | Eval FilePath
+  | Eval Input String
+  | Parse Input String
+  deriving (Eq, Show)
+
+data Input = File | StdIn
   deriving (Eq, Show)
 
 
@@ -43,9 +48,20 @@ parseCommand = hsubparser
                      (fullDesc <> progDesc "Start REPL"))
   -- eval file
   <> command "eval" (info (helper <*> parseSubCommand evalP)
-                      (fullDesc <> progDesc "Evaluate FILE"))
+                      (fullDesc <> progDesc "Evaluate INPUT"))
+  -- only parse
+  <> command "parse" (info (helper <*> parseSubCommand parseP)
+                      (fullDesc <> progDesc "Parse INPUT"))
   where
-    evalP = Eval <$> strArgument (metavar "FILE" <> help "Input FILE to eval")
+    input = flag File StdIn (short 'i' <> long "in"
+                            <> help "Read INPUT from standard input")
+            <|> flag' File (short 'F' <> long "file"
+                           <> help "Read INPUT from file (default)")
+    evalP = Eval
+      <$> input
+      <*> strArgument (metavar "INPUT" <> help "INPUT to evaluate")
+    parseP = Parse <$> input <*> strArgument (metavar "INPUT"
+                                              <> help "INPUT to parse")
 
 
 cliProgDesc :: String
@@ -67,10 +83,10 @@ runREPL _ = runInputT defaultSettings (loop mempty)
         Just (x, xs) ->
           let input = x ++ xs
           in do
-            let parseRes = parseCommands "*REPL*" input
-            case parseRes of
-              Right cmds -> do
-                (_ `InCtx` ctx') <- liftIO $ processCommands ctx cmds
+            let res = processInput ctx "*REPL*" input
+            case res of
+              Right (os `InCtx` ctx') -> do
+                mapM_ (outputStrLn.fst) os
                 loop ctx'
               Left err -> outputStrLn err *> loop ctx
             return ()
@@ -91,4 +107,11 @@ main = do
   importDirs <- mapM canonicalizePath importDirs'
   case subcommand of
     REPL -> runREPL importDirs
-    Eval f -> (fmap show <$> processFile f mempty) >>= putStrLn . thing
+    Eval what input -> caseInput what input (processInput mempty)
+      >>= either putErr (mapM_ (putStrLn . fst) . thing)
+    Parse what input -> caseInput what input parseCommands
+      >>= either putErr print
+  where
+    caseInput File fp f = f fp <$> readFile fp
+    caseInput StdIn input f = return $ f "*std-in*" input
+    putErr = hPutStrLn stderr

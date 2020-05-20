@@ -1,4 +1,4 @@
-module F.Decor (decor') where
+module F.Decor (decor', decorT') where
 
 
 import F.Syntax ( Context(..), Info(..), Term(..), Type(..)
@@ -22,7 +22,7 @@ decor' (Var fi vn _ _) ctx@(Ctx _ (Sum n)) =
            (\vi -> (Var fi vn vi n, ctx))
            mvi
 decor' (Abs fi vn ty t) ctx =
-  (Abs fi vn ty, ctx `addName` vn) .< decor' t
+  (Abs fi vn, ctx `addName` vn) .< decorT' ty .< decor' t
 decor' (App fi t1 t2) ctx =
   (App fi, ctx) .< decor' t1 .< decor' t2
 decor' (TAbs fi tn t) ctx =

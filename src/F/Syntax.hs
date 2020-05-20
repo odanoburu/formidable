@@ -128,7 +128,7 @@ typeShift d = typeShiftAbove d 0
 typeSubst :: Type -> Int -> Type -> Type
 typeSubst tyS = tymap go
   where
-    go j x n = if x == j then const (typeShift j tyS) else TyVar x n
+    go j x n = if x == j then const $ typeShift j tyS else TyVar x n
 
 
 typeSubstTop :: Type -> Type -> Type
