@@ -13,7 +13,8 @@ import Data.Set (Set)
 import qualified Data.Set as S
 import Prelude hiding (abs)
 import Text.Megaparsec hiding (State)
-import Text.Megaparsec.Char (alphaNumChar, letterChar, space1, string, upperChar)
+import Text.Megaparsec.Char ( alphaNumChar, lowerChar, space1
+                            , string, upperChar )
 --import Text.Megaparsec.Debug (dbg)
 import qualified Text.Megaparsec.Char.Lexer as L
 
@@ -47,7 +48,8 @@ command = try bind <|> someBind <|> eval
   where
     eval = Eval <$> info <*> term
     bind = Bind <$> info <*> varIdentifier <*> (varBind <|> termBind)
-      <|> Bind <$> info <*> tyIdentifier <*> error "TBI - typeBind"
+      <|> Bind <$> info <*> tyIdentifier
+                        <*> ((TypeBind <$> (equal *> typeP)) <|> pure TyVarBind)
       where
         varBind = VarBind <$> (colon *> typeP)
         termBind = TermBind <$> (equal *> term) <*> pure Nothing
@@ -126,7 +128,7 @@ keywords = S.fromList ["lambda", "in", "let", "as", "if", "then", "else"]
 
 varIdentifier :: Parser String
 varIdentifier = do
-  vn <- (:) <$> letterChar <*> alphanum <?> "variable name"
+  vn <- (:) <$> lowerChar <*> alphanum <?> "variable name"
   if vn `S.member` keywords
     then keywordAsVariable vn
     else return vn

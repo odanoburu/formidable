@@ -3,6 +3,7 @@ module F.Syntax (
   Command(..), Info(..), Type(..), Term(..), Binding(..), Context(..),
   TopLevel(..),
   addName,
+  dummyInfo,
   makeContext,
   termSubstTop,
   tytermSubstTop,
@@ -30,6 +31,11 @@ newtype Info = Offset Int
 
 instance Eq Info where
   _ == _ = True -- we don't care
+
+
+dummyInfo :: Info
+dummyInfo = Offset (-1)
+
 
 data Type
   -- primitive
@@ -65,6 +71,7 @@ data Binding
   | VarBind Type
   | TyVarBind
   | TermBind Term (Maybe Type)
+  | TypeBind Type
   deriving (Show)
 
 
@@ -208,7 +215,8 @@ bindingShift d (VarBind tyT) = VarBind $ typeShift d tyT
 bindingShift _ TyVarBind = TyVarBind
 bindingShift d (TermBind t mTy)
   = TermBind (termShift d t) $ fmap (typeShift d) mTy
-
+bindingShift d (TypeBind ty)
+  = TypeBind $ typeShift d ty
 
 getBinding :: Info -> Context -> Int -> Binding
 getBinding fi (Ctx ctx (Sum n)) i = case ctx !! i of
@@ -223,6 +231,7 @@ getTypeFromContext fi ctx i = case getBinding fi ctx i of
   TermBind _ (Just tyT) -> tyT
   TermBind _ Nothing -> showError fi $
     "No type for variable " ++ varname
+  TypeBind _ -> bindError
   where
     varname = indexToName fi ctx i
     bindError =

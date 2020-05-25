@@ -2,7 +2,6 @@
 module F.Eval
   (
     InContext(..),
-    decor,
     eval,
     eval1,
     evalBinding,
@@ -11,15 +10,15 @@ module F.Eval
 
 
 import F.Syntax (Type(..), Term(..), Binding(..), Context(..),
-                 addBinding, addName, getBinding, getTypeFromContext,
+                 addBinding, addName, dummyInfo, getBinding, getTypeFromContext,
                  termShift, termSubstTop, tytermSubstTop,
                  typeShift, typeSubstTop,
                  showError)
-import F.Decor (decor-- , decorT'
-               )
+import F.Decor (decor , decorT)
 
 
 import Control.Applicative ((<|>))
+import Data.Maybe (isJust, fromJust)
 --import Debug.Trace (trace)
 
 
@@ -78,7 +77,7 @@ typeOf ctx = go
     go (App fi t1 t2) =
       let tyT1 = typeOf ctx t1
           tyT2 = typeOf ctx t2
-      in case tyT1 of
+      in case simplifyType ctx tyT1 of
         TyArr tyT11 tyT12 ->
           if typeEqv ctx tyT2 tyT11
           then tyT12
@@ -126,7 +125,10 @@ typeEqv ctx ty1 ty2 = go ty1' ty2'
   where
     go TyBool TyBool = True
     go (TyId b1) (TyId b2) = b1 == b2
-    -- TODO: when type abscription we need to change this
+    go (TyVar i _ _) _
+      | isTypeAbscription ctx i = typeEqv ctx (getTypeAbscription ctx i) ty2'
+    go _ (TyVar j _ _)
+      | isTypeAbscription ctx j = typeEqv ctx ty2' ty1'
     go (TyVar i _ _) (TyVar j _ _) = i == j
     go (TyArr ty11 ty12) (TyArr ty21 ty22)
       = typeEqv ctx ty11 ty21 && typeEqv ctx ty12 ty22
@@ -148,12 +150,23 @@ typeEqv ctx ty1 ty2 = go ty1' ty2'
 
 
 simplifyType :: Context -> Type -> Type
-simplifyType ctx = rewrite (computeType ctx)
+simplifyType ctx = rewrite computeType
   where
-    -- TODO: implement when tyAbbBind is implemented
-    computeType _ TyVar{} = Nothing
-    computeType _ _ = Nothing
+    computeType (TyVar i _ _) = maybeAbscription ctx i
+    computeType _ = Nothing
 
+
+maybeAbscription :: Context -> Int -> Maybe Type
+maybeAbscription ctx i =
+  case getBinding dummyInfo ctx i of
+    TypeBind tyT -> Just tyT
+    _ -> Nothing
+
+
+isTypeAbscription :: Context -> Int -> Bool
+isTypeAbscription ctx i = isJust $ maybeAbscription ctx i
+getTypeAbscription :: Context -> Int -> Type
+getTypeAbscription ctx i = fromJust $ maybeAbscription ctx i
 
 rewrite :: (a -> Maybe a) -> a -> a
 rewrite f x = case f x of
@@ -161,19 +174,20 @@ rewrite f x = case f x of
   Nothing -> x
 
 
-evalBinding :: Context -> Binding -> Either String (InContext Binding)
+evalBinding :: Context -> Binding -> Either String Binding
 evalBinding ctx = go
   where
-    go b@NameBind = Right $ b `InCtx` ctx
-    go b@VarBind{} = Right $ b `InCtx` ctx
-    go b@TyVarBind = Right $ b `InCtx` ctx
+    go b@NameBind = Right b
+    go (VarBind tyT) = Right . VarBind $ decorT tyT ctx
+    go b@TyVarBind = Right b
     go (TermBind t mTyT) =
       let t' = decor t ctx
           tyT' = typeOf ctx t'
           t'' = eval ctx t'
       in if maybe True (typeEqv ctx tyT') mTyT
-         then Right $ TermBind t'' (mTyT <|> Just tyT') `InCtx` ctx
+         then Right $ TermBind t'' (mTyT <|> Just tyT')
          else Left "Type of binding does not match declared type"
+    go (TypeBind tyT) = Right . TypeBind $ decorT tyT ctx
 
 
 --- printing
@@ -205,7 +219,9 @@ showBinding ctx = go
       = case mTyT of
           Nothing -> show $ typeOf ctx t `InCtx` ctx
           Just tyT -> show $ tyT `InCtx` ctx
+    go (TypeBind tyT) = unwords ["=", showType ctx tyT]
+
 
 showType :: Context -> Type -> String
-showType _ = show -- FIXME: 
+showType _ = show -- FIXME: pretty-print!
 

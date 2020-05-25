@@ -8,7 +8,8 @@ module F.Lib
 
 import F.Syntax (Command(..), Context(..), addBinding)
 import F.Parser (parseCommands)
-import F.Eval (InContext(..), decor, eval, evalBinding, typeOf)
+import F.Decor (decor)
+import F.Eval (InContext(..), eval, evalBinding, typeOf)
 
 
 import Data.List (foldl')
@@ -24,8 +25,8 @@ processCommand ctx (Eval fi t) =
   in Right $ (out, Eval fi t'') `InCtx` ctx
 processCommand ctx (Bind fi x _bind) =
   case evalBinding ctx _bind of
-    Right bindInCtx@(bind' `InCtx` _) -> let
-      out = unwords [x, ":", show bindInCtx]
+    Right bind' -> let
+      out = unwords [x, ":", show bind']
       in Right $ (out, Bind fi x bind') `InCtx` addBinding ctx x bind'
     Left err -> Left err
 processCommand _ _ = error "TBI - processCommand"

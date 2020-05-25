@@ -1,4 +1,4 @@
-module F.Decor (decor, decorT') where
+module F.Decor (decor, decorT) where
 
 
 import F.Syntax ( Context(..), Info(..), Term(..), Type(..)
@@ -15,7 +15,7 @@ decor (Var fi vn _ _) ctx@(Ctx _ (Sum n)) =
            (\vi -> Var fi vn vi n)
            mvi
 decor (Abs fi vn ty t) ctx =
-  let ty' = decorT' ty ctx
+  let ty' = decorT ty ctx
       t' = decor t $ ctx `addName` vn
   in Abs fi vn ty' t'
 decor (App fi t1 t2) ctx =
@@ -26,7 +26,7 @@ decor (TAbs fi tn t) ctx =
   let t' = decor t $ ctx `addName` tn
   in TAbs fi tn t'
 decor (TApp fi t ty) ctx =
-  let ty' = decorT' ty ctx
+  let ty' = decorT ty ctx
       t' = decor t ctx
   in TApp fi t' ty'
 decor TPack{} _ = error "decor tpack"
@@ -41,20 +41,20 @@ decor (TIf fi tcond tt tf) ctx =
   in TIf fi tcond' tt' tf'
 
 
-decorT' :: Type -> Context -> Type
-decorT' TyBool _ = TyBool
-decorT' (TyId _) _ = error "decorT tyid"
-decorT' (TyVar _ _ tvn) ctx@(Ctx _ (Sum n)) =
+decorT :: Type -> Context -> Type
+decorT TyBool _ = TyBool
+decorT (TyId _) _ = error "decorT tyid"
+decorT (TyVar _ _ tvn) ctx@(Ctx _ (Sum n)) =
   case nameToIndex (Offset $ -1) ctx tvn of
     Just tvi -> TyVar tvi n tvn
     Nothing -> TyId tvn
-decorT' (TyArr t1 t2) ctx =
-  let t2' = decorT' t2 ctx
-      t1' = decorT' t1 ctx
+decorT (TyArr t1 t2) ctx =
+  let t2' = decorT t2 ctx
+      t1' = decorT t1 ctx
   in TyArr t1' t2'
-decorT' (TyAll tvn ty) ctx =
-  let ty' = decorT' ty $ ctx `addName` tvn
+decorT (TyAll tvn ty) ctx =
+  let ty' = decorT ty $ ctx `addName` tvn
   in TyAll tvn ty'
-decorT' (TySome tvn ty) ctx =
-  let ty' = decorT' ty $ ctx `addName` tvn
+decorT (TySome tvn ty) ctx =
+  let ty' = decorT ty $ ctx `addName` tvn
   in TySome tvn ty'
