@@ -15,23 +15,13 @@ import F.Syntax (Type(..), Term(..), Binding(..), Context(..),
                  termShift, termSubstTop, tytermSubstTop,
                  typeShift, typeSubstTop,
                  showError)
-import F.Decor (decor'-- , decorT'
+import F.Decor (decor-- , decorT'
                )
 
 
-import Debug.Trace (trace)
+import Control.Applicative ((<|>))
+--import Debug.Trace (trace)
 
-
-decor :: Term -> Context -> InContext Term
-decor t ctx =
-  let (t', ctx') = decor' t ctx
-  in t' `InCtx` ctx'
-
-
--- decorT :: Type -> Context -> InContext Type
--- decorT ty ctx =
---   let (ty', ctx') = decorT' ty ctx
---   in ty' `InCtx` ctx'
 
 isVal :: Context -> Term -> Bool
 isVal _ Abs{}    = True
@@ -100,7 +90,7 @@ typeOf ctx = go
       in TyAll tyX tyT2
     go (TApp fi t1 tyT2) =
       let tyT1 = typeOf ctx t1
-      in case tyT1 of
+      in case simplifyType ctx tyT1 of
         TyAll _ tyT12 -> typeSubstTop tyT2 tyT12
         _ -> showError fi "universal type expected"
     go (TPack fi tyT1 t2 tyT@(TySome _tyY tyT2)) =
@@ -132,7 +122,7 @@ typeOf ctx = go
 
 
 typeEqv :: Context -> Type -> Type -> Bool
-typeEqv ctx ty1 ty2 = go (trace (unwords [show ty1', show ty2', show ctx])ty1') ty2'
+typeEqv ctx ty1 ty2 = go ty1' ty2'
   where
     go TyBool TyBool = True
     go (TyId b1) (TyId b2) = b1 == b2
@@ -178,14 +168,11 @@ evalBinding ctx = go
     go b@VarBind{} = Right $ b `InCtx` ctx
     go b@TyVarBind = Right $ b `InCtx` ctx
     go (TermBind t mTyT) =
-      let (t' `InCtx` ctx') = decor t ctx
-          tyT' = typeOf ctx' t'
-          t'' = eval ctx' t'
-      in if maybe True (typeEqv ctx' tyT') mTyT
-      -- DOUBT: does returning tyT' which is equivalent but not
-      -- necessarily the same as mTyT = Just tyT generate confusing
-      -- error messages?
-         then Right $ TermBind t'' (Just tyT') `InCtx` ctx'
+      let t' = decor t ctx
+          tyT' = typeOf ctx t'
+          t'' = eval ctx t'
+      in if maybe True (typeEqv ctx tyT') mTyT
+         then Right $ TermBind t'' (mTyT <|> Just tyT') `InCtx` ctx
          else Left "Type of binding does not match declared type"
 
 
@@ -221,3 +208,4 @@ showBinding ctx = go
 
 showType :: Context -> Type -> String
 showType _ = show -- FIXME: 
+

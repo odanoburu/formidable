@@ -17,9 +17,9 @@ import Data.List (foldl')
 
 processCommand :: Context -> Command -> Either String (InContext (String, Command))
 processCommand ctx (Eval fi t) =
-  let (t' `InCtx` ctx') = decor t ctx
-      tyT = typeOf ctx' t'
-      t'' = eval ctx' t'
+  let t' = decor t ctx
+      tyT = typeOf ctx t'
+      t'' = eval ctx t'
       out = unwords [show t'', ":", show tyT]
   in Right $ (out, Eval fi t'') `InCtx` ctx
 processCommand ctx (Bind fi x _bind) =
@@ -45,3 +45,5 @@ processInput :: Context -> FilePath -> String
   -> Either String (InContext [(String, Command)])
 processInput initCtx fp input
   = parseCommands fp input >>= processCommands initCtx
+
+

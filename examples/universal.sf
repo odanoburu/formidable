@@ -1,0 +1,5 @@
+id = Lambda X. lambda x:X. x ;
+
+idBool = id [Bool] ;
+
+idBool #t ;

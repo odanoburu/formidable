@@ -108,7 +108,7 @@ main = do
   case subcommand of
     REPL -> runREPL importDirs
     Eval what input -> caseInput what input (processInput mempty)
-      >>= either putErr (mapM_ (putStrLn . fst) . thing)
+      >>= either putErr (mapM_ (putStrLn . fst) . reverse . thing)
     Parse what input -> caseInput what input parseCommands
       >>= either putErr print
   where

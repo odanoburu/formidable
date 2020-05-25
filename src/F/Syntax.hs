@@ -113,8 +113,8 @@ tymap onVar = go
 typeShiftAbove :: Int -> Int -> Type -> Type
 typeShiftAbove d = tymap go
   where
-    go c' x n =
-      if x >= c'
+    go c x n =
+      if x >= c
       then if x + d < 0
            then error "Scoping error"
            else TyVar (x+d) (n+d)
