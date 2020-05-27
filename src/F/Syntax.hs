@@ -41,6 +41,7 @@ dummyInfo = Offset (-1)
 data Type
   -- primitive
   = TyBool
+  | TyNat
   -- constructors
   | TyId String
   | TyVar Int Int String  -- type variable
@@ -64,6 +65,9 @@ data Term
   | TTrue Info
   | TFalse Info
   | TIf Info Term Term Term
+  | TZero Info
+  | TSucc Info Term
+  | TIsZero Info Term
   deriving (Eq, Show)
 
 
@@ -111,6 +115,7 @@ tymap :: (Int -> Int -> Int -> (String -> Type)) -> Int -> Type -> Type
 tymap onVar = go
   where
     go _ TyBool = TyBool
+    go _ TyNat = TyNat
     go _ (TyId tn) = TyId tn
     go c (TyArr tyT1 tyT2) = TyArr (go c tyT1) (go c tyT2)
     go c (TyVar x n tn) = onVar c x n tn
@@ -159,6 +164,9 @@ tmmap onVar onType = go
     go _ (TTrue fi) = TTrue fi
     go _ (TFalse fi) = TFalse fi
     go c (TIf fi tcond tt tf) = TIf fi (go c tcond) (go c tt) (go c tf)
+    go _ z@TZero{} = z
+    go _ s@TSucc{} = s
+    go _ isZ@TIsZero{} = isZ
 
 
 termShiftAbove :: Int -> Int -> Term -> Term

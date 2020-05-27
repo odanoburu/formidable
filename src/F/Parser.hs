@@ -11,6 +11,7 @@ import Data.Bifunctor (bimap)
 import Data.Char (isAlphaNum, isAsciiLower, isAsciiUpper)
 import Data.Set (Set)
 import qualified Data.Set as S
+import Numeric.Natural (Natural)
 import Prelude hiding (abs)
 import Text.Megaparsec hiding (State)
 import Text.Megaparsec.Char ( alphaNumChar, space1
@@ -95,6 +96,8 @@ termAtom = parens term
   -- add-ons
   <|> bool
   <|> tIf
+  <|> nat
+  <|> isZero
   where
     var = Var <$> info <*> termIdentifier <*> pure pix <*> pure pix
     abs = Abs <$> info
@@ -118,6 +121,12 @@ termAtom = parens term
       <*> (pKeyword "if" *> term)
       <*> (pKeyword "then" *> term)
       <*> (pKeyword "else" *> term)
+    nat = toNat <$> info <*> lexeme L.decimal
+      where
+        toNat :: Info -> Natural -> Term
+        toNat fi 0 = TZero fi
+        toNat fi n = TSucc fi (toNat fi (n-1))
+    isZero = TIsZero <$> info <*> (pKeyword "isZero" *> term)
 
 
 term :: Parser Term
@@ -133,7 +142,7 @@ keywords :: Set String
 keywords
   = S.fromList [
   "Forall", "Exists", "λ", "lambda", "Λ", "Lambda", "in",
-  "let", "as", "if", "then", "else"
+  "let", "as", "if", "then", "else", "isZero"
   ]
 
 termIdentifier :: Parser String

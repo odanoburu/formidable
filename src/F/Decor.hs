@@ -41,17 +41,25 @@ decor (TUnpack fi tyX x t1 t2) ctx =
       t2' = decor t2 ctx''
   in TUnpack fi tyX x t1' t2'
 -- add-ons
-decor (TTrue fi) _ = TTrue fi
-decor (TFalse fi) _ = TFalse fi
+decor t@TTrue{} _ = t
+decor f@TFalse{} _ = f
 decor (TIf fi tcond tt tf) ctx =
   let tcond' = decor tcond ctx
       tt' = decor tt ctx
       tf' = decor tf ctx
   in TIf fi tcond' tt' tf'
+decor z@TZero{} _ = z
+decor (TSucc fi t) ctx =
+  let t' = decor t ctx
+  in TSucc fi t'
+decor (TIsZero fi t) ctx =
+  let t' = decor t ctx
+  in TIsZero fi t'
 
 
 decorT :: Type -> Context -> Type
 decorT TyBool _ = TyBool
+decorT TyNat _ = TyNat
 decorT (TyId _) _ = error "decorT tyid"
 decorT (TyVar _ _ tvn) ctx@(Ctx _ (Sum n)) =
   case nameToIndex (Offset $ -1) ctx tvn of

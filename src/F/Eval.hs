@@ -26,9 +26,18 @@ import Data.Maybe (isJust, fromJust)
 isVal :: Context -> Term -> Bool
 isVal _ Abs{}    = True
 isVal _ TAbs{}   = True
+isVal ctx (TPack _ _ v _) = isVal ctx v
 isVal _ TTrue{}  = True
 isVal _ TFalse{} = True
-isVal _ _ = False
+isVal _ TZero{}  = True
+isVal ctx (TSucc _ t) = isVal ctx t
+isVal _ Var{} = False
+isVal _ App{} = False
+isVal _ TApp{} = False
+isVal _ TUnpack{} = False
+isVal _ TIf{} = False
+isVal _ TIsZero{} = False
+
 
 eval1 :: Context -> Term -> Maybe Term
 eval1 ctx = go
@@ -59,6 +68,11 @@ eval1 ctx = go
     go (TIf _ TFalse{} _ tf) = Just tf
     go (TIf fi tcond tt tf) =
       eval1 ctx tcond >>= \tcond' -> Just $ TIf fi tcond' tt tf
+    go TZero{} = Nothing
+    go (TSucc fi t) = eval1 ctx t >>= Just . TSucc fi
+    go (TIsZero fi TZero{}) = Just $ TTrue fi
+    go (TIsZero fi TSucc{}) = Just $ TFalse fi
+    go (TIsZero fi t) = eval1 ctx t >>= Just . TIsZero fi
 
 
 eval :: Context -> Term -> Term
@@ -118,12 +132,20 @@ typeOf ctx = go
               then tytt
               else err fi "arms of conditional have different types"
       else err fi "conditional guard is not a boolean"
+    go TZero{} = TyNat
+    go (TSucc fi t) =
+      if typeEqv ctx (typeOf ctx t) TyNat
+      then TyNat
+      else err fi "argument of successor be of type Nat"
+    go (TIsZero fi t) =
+      if typeEqv ctx (typeOf ctx t) TyNat
+      then TyBool
+      else err fi "argument of iszero must be of type Nat"
 
 
 typeEqv :: Context -> Type -> Type -> Bool
 typeEqv ctx ty1 ty2 = go ty1' ty2'
   where
-    go TyBool TyBool = True
     go (TyId b1) (TyId b2) = b1 == b2
     go (TyVar i _ _) _
       | isTypeAbscription ctx i = typeEqv ctx (getTypeAbscription ctx i) ty2'
@@ -134,8 +156,12 @@ typeEqv ctx ty1 ty2 = go ty1' ty2'
       = typeEqv ctx ty11 ty21 && typeEqv ctx ty12 ty22
     go (TySome tyX ty11) (TySome _ ty21) = highOrdEqv tyX ty11 ty21
     go (TyAll tyX ty11) (TyAll _ ty21) = highOrdEqv tyX ty11 ty21
+    go TyBool TyBool = True
     go TyBool _ = False
     go _ TyBool = False
+    go TyNat TyNat = True
+    go TyNat _ = False
+    go _ TyNat = False
     go TyId{} _ = False
     go _ TyId{} = False
     go TyArr{} _ = False
