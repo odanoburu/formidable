@@ -47,13 +47,19 @@ command :: Parser Command
 command = try bind <|> someBind <|> eval
   where
     eval = Eval <$> info <*> term
-    bind = Bind <$> info <*> varIdentifier <*> (varBind <|> termBind)
+    bind
+      = Bind <$> info <*> varIdentifier <*> (varBind <|> termBind)
       <|> Bind <$> info <*> tyIdentifier
                         <*> ((TypeBind <$> (equal *> typeP)) <|> pure TyVarBind)
       where
         varBind = VarBind <$> (colon *> typeP)
         termBind = TermBind <$> (equal *> term) <*> pure Nothing
-    someBind = fail "TBI - somebind"
+    someBind
+      = SomeBind
+      <$> info
+      <*> (lcurly *> tyIdentifier <* comma)
+      <*> (varIdentifier <* rcurly)
+      <*> (equal *> term)
 
 
 typeAtom :: Parser Type
@@ -99,13 +105,13 @@ termAtom = parens term
       <*> (pKeyword "Lambda" *> tyIdentifier <* period)
       <*> term <?> "type abstraction"
     tPack = TPack <$> info
-      <*> (symbol "{" *> symbol "*" *> typeP)
-      <*> (comma *> term <* symbol "}")
+      <*> (lcurly *> symbol "*" *> typeP)
+      <*> (comma *> term <* rcurly)
       <*> (pKeyword "as" *> typeP)
     tUnpack = TUnpack <$> info
-      <*> (pKeyword "let" *> symbol "{" *> tyIdentifier)
-      <*> (comma *> varIdentifier <* symbol "}")
-      <*> (symbol "=" *> term <* pKeyword "in")
+      <*> (pKeyword "let" *> lcurly *> tyIdentifier)
+      <*> (comma *> varIdentifier <* rcurly)
+      <*> (equal *> term <* pKeyword "in")
       <*> term
     bool = TTrue <$> info <* symbol "#t" <|> TFalse <$> info <* symbol "#f"
     tIf = TIf <$> info
@@ -160,18 +166,18 @@ pKeyword keyword = void $ lexeme (string keyword <* notFollowedBy alphaNumChar)
 pair :: (String, String) -> Parser b -> Parser b
 pair (beg, end) = between (symbol beg) (symbol end)
 
-parens :: Parser a -> Parser a
+parens, brackets :: Parser a -> Parser a
 parens = pair ("(", ")")
-
-brackets :: Parser a -> Parser a
 brackets = pair ("[", "]")
 
-comma, equal, period, colon, semicolon :: Parser ()
+comma, equal, period, colon, semicolon, lcurly, rcurly :: Parser ()
 comma = void $ symbol ","
 equal = void $ symbol "="
 period = void $ symbol "."
 colon = void $ symbol ":"
 semicolon = void $ symbol ";"
+lcurly = void $ symbol "{"
+rcurly = void $ symbol "}"
 
 info :: Parser Info
 info = Offset <$> getOffset

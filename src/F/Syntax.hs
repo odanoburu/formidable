@@ -4,6 +4,7 @@ module F.Syntax (
   TopLevel(..),
   addName,
   dummyInfo,
+  err,
   makeContext,
   termSubstTop,
   tytermSubstTop,
@@ -218,10 +219,12 @@ bindingShift d (TermBind t mTy)
 bindingShift d (TypeBind ty)
   = TypeBind $ typeShift d ty
 
+
 getBinding :: Info -> Context -> Int -> Binding
 getBinding fi (Ctx ctx (Sum n)) i = case ctx !! i of
   Just (_, bind) -> bindingShift (i+1) bind
   Nothing -> variableLookupFailure fi i n
+
 
 getTypeFromContext :: Info -> Context -> Int -> Type
 getTypeFromContext fi ctx i = case getBinding fi ctx i of
@@ -229,15 +232,14 @@ getTypeFromContext fi ctx i = case getBinding fi ctx i of
   (VarBind tyT) -> tyT
   TyVarBind -> bindError
   TermBind _ (Just tyT) -> tyT
-  TermBind _ Nothing -> showError fi $
+  TermBind _ Nothing -> err fi $
     "No type for variable " ++ varname
   TypeBind _ -> bindError
   where
     varname = indexToName fi ctx i
     bindError =
-      showError fi $
-                "getTypeFromContext: Wrong kind of binding for variable "
-                ++ varname
+      err fi $ "getTypeFromContext: Wrong kind of binding for variable "
+               ++ varname
 
 
 indexToName :: Info -> Context -> Int -> String
@@ -246,15 +248,18 @@ indexToName fi (Ctx ctx (Sum n)) i = case ctx !! i of
   Nothing -> variableLookupFailure fi i n
 
 variableLookupFailure :: Info -> Int -> Int -> a
-variableLookupFailure fi i n = showError fi $
+variableLookupFailure fi i n = err fi $
   unwords ["Variable lookup failure: offset was", show i,
             ", context size was", show n]
 
 
 ---
 -- auxiliary definitions
-showError :: Info -> String -> a
-showError fi msg = error $ unwords [show fi, msg]
+err :: Info -> String -> a
+err fi msg = error $ showError fi msg
+
+showError :: Info -> String -> String
+showError fi msg = unwords [show fi, msg]
 
 infixl 9  !!
 (!!) :: [a] -> Int -> Maybe a

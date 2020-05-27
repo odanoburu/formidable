@@ -5,6 +5,7 @@ module F.Eval
     eval,
     eval1,
     evalBinding,
+    simplifyType,
     typeOf,
     ) where
 
@@ -13,7 +14,7 @@ import F.Syntax (Type(..), Term(..), Binding(..), Context(..),
                  addBinding, addName, dummyInfo, getBinding, getTypeFromContext,
                  termShift, termSubstTop, tytermSubstTop,
                  typeShift, typeSubstTop,
-                 showError)
+                 err)
 import F.Decor (decor , decorT)
 
 
@@ -81,8 +82,8 @@ typeOf ctx = go
         TyArr tyT11 tyT12 ->
           if typeEqv ctx tyT2 tyT11
           then tyT12
-          else showError fi "parameter type mismatch"
-        _ -> showError fi "arrow type expected"
+          else err fi "parameter type mismatch"
+        _ -> err fi "arrow type expected"
     go (TAbs _fi tyX t2) =
       let ctx' = addBinding ctx tyX TyVarBind
           tyT2 = typeOf ctx' t2
@@ -91,14 +92,14 @@ typeOf ctx = go
       let tyT1 = typeOf ctx t1
       in case simplifyType ctx tyT1 of
         TyAll _ tyT12 -> typeSubstTop tyT2 tyT12
-        _ -> showError fi "universal type expected"
+        _ -> err fi "universal type expected"
     go (TPack fi tyT1 t2 tyT@(TySome _tyY tyT2)) =
       let tyU  = typeOf ctx t2
           tyU' = typeSubstTop tyT1 tyT2
       in if typeEqv ctx tyU tyU'
          then tyT
-         else showError fi "doesn't match declared type"
-    go (TPack fi _ _ _) = showError fi "existential type expected"
+         else err fi "doesn't match declared type"
+    go (TPack fi _ _ _) = err fi "existential type expected"
     go (TUnpack fi tyX x t1 t2) =
       let tyT1 = typeOf ctx t1
       in case tyT1 of
@@ -107,7 +108,7 @@ typeOf ctx = go
               ctx'' = addBinding ctx' x (VarBind tyT11)
               tyT2  = typeOf ctx'' t2
           in typeShift (-2) tyT2
-        _ -> showError fi "existential type expected"
+        _ -> err fi "existential type expected"
     go (TTrue _)  = TyBool
     go (TFalse _) = TyBool
     go (TIf fi tcond tt tf) =
@@ -115,9 +116,8 @@ typeOf ctx = go
       then let tytt = typeOf ctx tt
            in if typeEqv ctx tytt $ typeOf ctx tf
               then tytt
-              else showError fi
-                             "arms of conditional have different types*IMPROVEMSG*"
-      else showError fi "conditional guard is not a boolean"
+              else err fi "arms of conditional have different types"
+      else err fi "conditional guard is not a boolean"
 
 
 typeEqv :: Context -> Type -> Type -> Bool

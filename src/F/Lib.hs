@@ -6,10 +6,11 @@ module F.Lib
     ) where
 
 
-import F.Syntax (Command(..), Context(..), addBinding)
+import F.Syntax ( Binding(..), Command(..), Context(..), Term(..), Type(..)
+                , addBinding, showError, termShift )
 import F.Parser (parseCommands)
 import F.Decor (decor)
-import F.Eval (InContext(..), eval, evalBinding, typeOf)
+import F.Eval (InContext(..), eval, evalBinding, simplifyType, typeOf)
 
 
 import Data.List (foldl')
@@ -29,8 +30,20 @@ processCommand ctx (Bind fi x _bind) =
       out = unwords [x, ":", show bind']
       in Right $ (out, Bind fi x bind') `InCtx` addBinding ctx x bind'
     Left err -> Left err
-processCommand _ _ = error "TBI - processCommand"
-
+processCommand ctx (SomeBind fi tyX x t) =
+  case simplifyType ctx $ typeOf ctx t' of
+    TySome _ tyBody ->
+      let t'' = eval ctx t'
+          b = case t'' of
+            TPack _ _ t12 _ -> TermBind (termShift 1 t12) (Just tyBody)
+            _ -> VarBind tyBody
+          ctx' = addBinding ctx tyX TyVarBind
+          ctx'' = addBinding ctx' x b
+          out = unwords [tyX, x, ":", show tyBody]
+      in Right $ (out, SomeBind fi tyX x t'') `InCtx` ctx''
+    _ -> Left $ showError fi "Expected existential type"
+  where
+    t' = decor t ctx
 
 processCommands :: Context -> [Command]
   -> Either String (InContext [(String, Command)])

@@ -1,0 +1,2 @@
+p = {*Bool, #t} as exists X, X ;
+

@@ -2,7 +2,7 @@ module F.Decor (decor, decorT) where
 
 
 import F.Syntax ( Context(..), Info(..), Term(..), Type(..)
-                , addName, nameToIndex, showError )
+                , addName, nameToIndex, err )
 
 
 import Data.Semigroup (Sum(..))
@@ -11,7 +11,7 @@ import Data.Semigroup (Sum(..))
 decor :: Term -> Context -> Term
 decor (Var fi vn _ _) ctx@(Ctx _ (Sum n)) =
   let mvi = nameToIndex fi ctx vn
-  in maybe (showError fi $ unwords ["Unbound identifier", show vn])
+  in maybe (err fi $ unwords ["Unbound identifier", show vn])
            (\vi -> Var fi vn vi n)
            mvi
 decor (Abs fi vn ty t) ctx =
@@ -29,8 +29,17 @@ decor (TApp fi t ty) ctx =
   let ty' = decorT ty ctx
       t' = decor t ctx
   in TApp fi t' ty'
-decor TPack{} _ = error "decor tpack"
-decor TUnpack{} _ = error "decor tunpack"
+decor (TPack fi ty1 t ty2) ctx =
+  let ty1' = decorT ty1 ctx
+      t' = decor t ctx
+      ty2' = decorT ty2 ctx
+  in TPack fi ty1' t' ty2'
+decor (TUnpack fi tyX x t1 t2) ctx =
+  let ctx' = ctx `addName` tyX
+      ctx'' = ctx' `addName` x
+      t1' = decor t1 ctx
+      t2' = decor t2 ctx''
+  in TUnpack fi tyX x t1' t2'
 -- add-ons
 decor (TTrue fi) _ = TTrue fi
 decor (TFalse fi) _ = TFalse fi
