@@ -1,9 +1,9 @@
-ID = forall X. X -> X ;
+ID = Forall X. X -> X ;
 
 B2B = Bool -> Bool ;
 
 onTrue = lambda f:B2B. f #t ;
 
-not = lambda b:Bool. if b then #f else b ;
+not = λb:Bool. if b then #f else b ;
 
 onTrue not ;

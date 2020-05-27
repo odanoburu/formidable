@@ -32,7 +32,7 @@ termSpec = describe "term" $ do
     "(lambda x:Bool . x )" `termParsesAs` Abs d "x" TyBool (Var d "x" pix pix)
 
   specify "lambda with inline comment" $
-    "lambda x: Bool. x // oi" `termParsesAs` Abs d "x" TyBool (Var d "x" pix pix)
+    "λ x: Bool. x // oi" `termParsesAs` Abs d "x" TyBool (Var d "x" pix pix)
 
   specify "lambda with block comment" $
     "lambda x :Bool. /* oi */ x" `termParsesAs` Abs d "x" TyBool (Var d "x" pix pix)
@@ -66,14 +66,14 @@ termSpec = describe "term" $ do
     Abs d "x" (TyArr TyBool TyBool) (Var d "x" pix pix)
 
   specify "type variables" $
-    "lambda x:B. x" `termParsesAs` Abs d "x" (TyVar pix pix "B") (Var d "x" pix pix)
+    "λ x:B. x" `termParsesAs` Abs d "x" (TyVar pix pix "B") (Var d "x" pix pix)
 
   specify "with the universal type" $
-    "lambda x:forall X. X. x" `termParsesAs`
+    "λ x:∀ X. X. x" `termParsesAs`
     Abs d "x" (TyAll "X" $ TyVar pix pix "X") (Var d "x" pix pix)
 
   specify "with the existential type" $
-    "lambda x:exists X, X. x" `termParsesAs`
+    "λ x:∃X, X. x" `termParsesAs`
     Abs d "x" (TySome "X" $ TyVar pix pix "X") (Var d "x" pix pix)
 
   -- add-ons
@@ -96,13 +96,12 @@ typeSpec = describe "type" $ do
     "Bool" `typeParsesAs` TyBool
 
   specify "universally quantified" $
-    "forall B . B" `typeParsesAs` TyAll "B" (TyVar pix pix "B")
+    "Forall B . B" `typeParsesAs` TyAll "B" (TyVar pix pix "B")
 
   specify "existentially quantified" $
-    "exists C, C->Bool" `typeParsesAs` TySome "C" (TyArr (TyVar pix pix "C")
+    "Exists C, C->Bool" `typeParsesAs` TySome "C" (TyArr (TyVar pix pix "C")
                                                    TyBool)
 
   specify "arrow type" $
     "Bool -> A -> Bool" `typeParsesAs` TyArr TyBool (TyArr (TyVar pix pix "A")
                                                            TyBool)
-

@@ -21,6 +21,10 @@ following [[https://www.cis.upenn.edu/~bcpierce/tapl/][TAPL]] (not strictly thou
 
 currently there's a way to evaluate a single file or use a REPL.
 
+** syntax
+
+see the files in the =examples= directory.
+
 
 * testing
 

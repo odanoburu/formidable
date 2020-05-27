@@ -1,7 +1,0 @@
-lambda x:Bool. x ;  // lambda
-
-if #t then #t else #f ;  // conditional
-
-f = lambda x:Bool. if x then #f else #t;
-
-f #f ;

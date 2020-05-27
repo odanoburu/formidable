@@ -1,2 +1,2 @@
-p = {*Bool, #t} as exists X, X ;
+p = {*Bool, #t} as Exists X, X ;
 

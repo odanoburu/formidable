@@ -1,0 +1,35 @@
+// this is a comment
+/* and
+   so
+   is
+   this */
+
+
+/* simple expressions */
+
+#t ;  // true
+#f ;  // false
+
+// anonymous functions take only one argument, which must be typed
+lambda b:Bool. b ; // identity functions for booleans
+
+λb:Bool. b ; // you are not restricted to ascii unless you want to 😎
+
+// application is just juxtaposition
+(λb:Bool. b) #t ; // => #t : Bool
+
+// if then else (else is mandatory!)
+if #t then #f else #t ;
+
+
+/* binding names */
+
+not = λb:Bool. if b then #f else #t ;  // binding terms to names
+
+BtoB = Bool -> Bool ; // binding types to names (type aliases)
+
+onTrue = λf:BtoB. f #t ; // apply function of type Bool -> Bool to
+			 // true
+
+// as you might have noticed, term variables start with lowercase
+// letters, and types and type variables start with uppercase letters
