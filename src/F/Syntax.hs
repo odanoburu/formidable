@@ -68,6 +68,7 @@ data Term
   | TIf Info Term Term Term
   | TZero Info
   | TSucc Info Term
+  | TPred Info Term
   | TIsZero Info Term
   deriving (Eq, Show)
 
@@ -167,8 +168,9 @@ tmmap onVar onType = go
     go _ f@TFalse{} = f
     go c (TIf fi tcond tt tf) = TIf fi (go c tcond) (go c tt) (go c tf)
     go _ z@TZero{} = z
-    go _ s@TSucc{} = s
-    go _ isZ@TIsZero{} = isZ
+    go c (TSucc fi t) = TSucc fi $ go c t
+    go c (TPred fi t) = TPred fi $ go c t
+    go c (TIsZero fi t) = TIsZero fi $ go c t
 
 
 termShiftAbove :: Int -> Int -> Term -> Term
@@ -268,10 +270,12 @@ variableLookupFailure fi i n = err fi $
 err :: Info -> String -> a
 err fi msg = error $ showError fi msg
 
-showError :: Info -> String -> String
-showError fi msg = unwords [show fi, msg]
 
-infixl 9  !!
+showError :: Info -> String -> String
+showError (Offset n) msg = concat [show n, ":", msg]
+
+
+infixl 9  !! -- safe indexing
 (!!) :: [a] -> Int -> Maybe a
 (x:_) !! 0 = Just x
 (_:xs) !! n = xs !! (n-1)

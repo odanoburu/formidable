@@ -31,6 +31,7 @@ isVal _ TTrue{}  = True
 isVal _ TFalse{} = True
 isVal _ TZero{}  = True
 isVal ctx (TSucc _ t) = isVal ctx t
+isVal ctx (TPred _ t) = isVal ctx t
 isVal _ Var{} = False
 isVal _ App{} = False
 isVal _ TApp{} = False
@@ -74,6 +75,9 @@ eval1 ctx = go
       eval1 ctx tcond >>= \tcond' -> Just $ TIf fi tcond' tt tf
     go TZero{} = Nothing
     go (TSucc fi t) = eval1 ctx t >>= Just . TSucc fi
+    go (TPred _ z@TZero{}) = Just z
+    go (TPred _ (TSucc _ t)) = Just t
+    go (TPred fi t) = eval1 ctx t >>= Just . TPred fi
     go (TIsZero fi TZero{}) = Just $ TTrue fi
     go (TIsZero fi TSucc{}) = Just $ TFalse fi
     go (TIsZero fi t) = eval1 ctx t >>= Just . TIsZero fi
@@ -137,22 +141,26 @@ typeOf ctx = go
     go (TTrue _)  = TyBool
     go (TFalse _) = TyBool
     go (TIf fi tcond tt tf) =
-      if typeEqv ctx (typeOf ctx tcond) TyBool
+      if typeIs TyBool tcond
       then let tytt = typeOf ctx tt
-           in if typeEqv ctx tytt $ typeOf ctx tf
+           in if typeIs tytt tf
               then tytt
               else err fi "if: arms of conditional have different types"
       else err fi "if: conditional guard is not a boolean"
     go TZero{} = TyNat
     go (TSucc fi t) =
-      if typeEqv ctx (typeOf ctx t) TyNat
+      if typeIs TyNat t
       then TyNat
       else err fi "succ: argument must be of type Nat"
+    go (TPred fi t) =
+      if typeIs TyNat t
+      then TyNat
+      else err fi "pred: argument must be of type Nat"
     go (TIsZero fi t) =
-      if typeEqv ctx (typeOf ctx t) TyNat
+      if typeIs TyNat t
       then TyBool
       else err fi "iszero: argument must be of type Nat"
-
+    typeIs ty t = typeEqv ctx ty $ typeOf ctx t
 
 typeEqv :: Context -> Type -> Type -> Bool
 typeEqv ctx ty1 ty2 = go ty1' ty2'

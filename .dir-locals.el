@@ -3,7 +3,7 @@
 
 ((haskell-mode
   (haskell-process-type . stack-ghci)
-  (compile-command . "stack build --pedantic --fast --copy-bins ")))
+  (compile-command . "stack build --copy-bins --fast --pedantic ")))
 
 
 

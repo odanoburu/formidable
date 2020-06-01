@@ -12,7 +12,7 @@ import Data.Char (isAlphaNum, isAsciiLower, isAsciiUpper)
 import Data.Set (Set)
 import qualified Data.Set as S
 import Numeric.Natural (Natural)
-import Prelude hiding (abs)
+import Prelude hiding (abs, pred, succ)
 import Text.Megaparsec hiding (State)
 import Text.Megaparsec.Char ( alphaNumChar, space1
                             , string )
@@ -67,7 +67,8 @@ typeAtom :: Parser Type
 typeAtom = parens typeP
   <|> allTy
   <|> someTy
-  <|> (TyBool <$ symbol "Bool" <?> "Bool type")
+  <|> (TyBool <$ pKeyword "Bool" <?> "Bool type")
+  <|> (TyNat <$ pKeyword "Nat" <?> "Nat type")
   <|> (TyVar pix pix <$> tyIdentifier <?> "type variable")
   where
     allTy = TyAll
@@ -98,6 +99,8 @@ termAtom = parens term
   <|> bool
   <|> tIf
   <|> nat
+  <|> succ
+  <|> pred
   <|> isZero
   where
     var = Var <$> info <*> termIdentifier <*> pure pix <*> pure pix
@@ -130,6 +133,12 @@ termAtom = parens term
         toNat :: Info -> Natural -> Term
         toNat fi 0 = TZero fi
         toNat fi n = TSucc fi (toNat fi (n-1))
+    succ = TSucc
+      <$> info
+      <*> (pKeyword "succ" *> term)
+    pred = TPred
+      <$> info
+      <*> (pKeyword "pred" *> term)
     isZero = TIsZero <$> info <*> (pKeyword "isZero" *> term)
 
 
@@ -146,7 +155,8 @@ keywords :: Set String
 keywords
   = S.fromList [
   "Forall", "Exists", "λ", "lambda", "Λ", "Lambda", "in",
-  "let", "as", "fix", "if", "then", "else", "isZero"
+  "let", "as", "fix", "if", "then", "else", "succ", "pred", "isZero",
+  "Nat", "Bool"
   ]
 
 termIdentifier :: Parser String

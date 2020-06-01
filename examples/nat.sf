@@ -1,5 +1,37 @@
 0 ;
+1 ;
 
 isZero 0 ;
-
 isZero 1 ;
+
+succ 0 ;
+succ 1 ;
+
+pred 0;
+pred 1 ;
+
+nn = λh:Nat -> Nat -> Nat.
+      λm:Nat. λn:Nat. if isZero m
+              then n
+              else h (pred m) (succ n) ;
+
+add = fix nn ;
+
+add 0 0 ;
+add 2 0 ;
+add 0 2 ;
+add 5 4 ;
+
+
+mulf = λh:Nat -> Nat -> Nat.
+      λm:Nat. λn:Nat.
+              if isZero m
+              then 0
+              else add n (h (pred m) n) ;
+
+mul = fix mulf ;
+
+mul 0 2 ;
+mul 2 0 ;
+mul 2 3 ;
+mul 3 2 ;

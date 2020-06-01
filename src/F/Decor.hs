@@ -55,6 +55,9 @@ decor z@TZero{} _ = z
 decor (TSucc fi t) ctx =
   let t' = decor t ctx
   in TSucc fi t'
+decor (TPred fi t) ctx =
+  let t' = decor t ctx
+  in TPred fi t'
 decor (TIsZero fi t) ctx =
   let t' = decor t ctx
   in TIsZero fi t'
