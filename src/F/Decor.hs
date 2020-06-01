@@ -44,6 +44,13 @@ decor (TUnpack fi tyX x t1 t2) ctx =
 decor (Fix fi t) ctx =
   let t' = decor t ctx
   in Fix fi t'
+decor (Tuple fi ts) ctx =
+  let ts' = fmap (`decor` ctx) ts
+  in Tuple fi ts'
+decor (TupleProj fi tu ti) ctx =
+  let tu' = decor tu ctx
+      ti' = decor ti ctx
+  in TupleProj fi tu' ti'
 decor t@TTrue{} _ = t
 decor f@TFalse{} _ = f
 decor (TIf fi tcond tt tf) ctx =
@@ -81,3 +88,6 @@ decorT (TyAll tvn ty) ctx =
 decorT (TySome tvn ty) ctx =
   let ty' = decorT ty $ ctx `addName` tvn
   in TySome tvn ty'
+decorT (TyTuple tys) ctx =
+  let tys' = fmap (`decorT` ctx) tys
+  in TyTuple tys'

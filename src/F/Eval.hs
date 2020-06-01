@@ -19,7 +19,8 @@ import F.Decor (decor , decorT)
 
 
 import Control.Applicative ((<|>))
-import Data.Maybe (isJust, fromJust)
+import Data.Maybe (isJust, fromJust, fromMaybe)
+import Prelude hiding ((!!))
 --import Debug.Trace (trace)
 
 
@@ -27,6 +28,7 @@ isVal :: Context -> Term -> Bool
 isVal _ Abs{}    = True
 isVal _ TAbs{}   = True
 isVal ctx (TPack _ _ v _) = isVal ctx v
+isVal ctx (Tuple _ ts) = all (isVal ctx) ts
 isVal _ TTrue{}  = True
 isVal _ TFalse{} = True
 isVal _ TZero{}  = True
@@ -37,6 +39,7 @@ isVal _ App{} = False
 isVal _ TApp{} = False
 isVal _ TUnpack{} = False
 isVal _ Fix{} = False
+isVal _ TupleProj{} = False
 isVal _ TIf{} = False
 isVal _ TIsZero{} = False
 
@@ -67,6 +70,29 @@ eval1 ctx = go
     go t@(Fix _ (Abs _ _ _ body)) =
       Just $ termSubstTop t body
     go (Fix fi t) = eval1 ctx t >>= Just . Fix fi
+    go (Tuple _ []) = Nothing
+    go (Tuple fi ts) = case foldr f (False, []) ts of
+      (True, ts') -> Just $ Tuple fi ts'
+      (False, _) -> Nothing
+      where
+        f t (True, ts') = (True, t:ts')
+        f t (False, ts') = case eval1 ctx t of
+          Just t' -> (True, t':ts')
+          Nothing -> (False, t:ts')
+    go (TupleProj _ (Tuple _ []) _) = Nothing -- DOUBT: will typeOf get this error?
+    go (TupleProj _ (Tuple _ (t:_)) TZero{})
+      | isVal ctx t = Just t
+    go (TupleProj fi (Tuple fi' (t:ts)) z@TZero{}) =
+      eval1 ctx t >>= \t' -> Just $ TupleProj fi (Tuple fi' (t':ts)) z
+    go (TupleProj fi (Tuple fi' (_:ts)) (TSucc _ ti)) = Just
+      -- DOUBT: how hacky is this? will it show non-sensical error
+      -- messages to the user? (I'm guesshoping not since eval1 is
+      -- total)
+      $ TupleProj fi (Tuple fi' ts) ti
+    go (TupleProj fi tu@Tuple{} ti) =
+      eval1 ctx ti >>= Just . TupleProj fi tu
+    go (TupleProj fi tu ti) =
+      eval1 ctx tu >>= \tu' -> Just $ TupleProj fi tu' ti
     go TTrue{} = Nothing
     go TFalse{} = Nothing
     go (TIf _ TTrue{} tt _) = Just tt
@@ -111,8 +137,7 @@ typeOf ctx = go
           tyT2 = typeOf ctx' t2
       in TyAll tyX tyT2
     go (TApp fi t1 tyT2) =
-      let tyT1 = typeOf ctx t1
-      in case simplifyType ctx tyT1 of
+      case simpleTypeOf t1 of
         TyAll _ tyT12 -> typeSubstTop tyT2 tyT12
         _ -> err fi "app: universal type expected"
     go (TPack fi tyT1 t2 tyT@(TySome _tyY tyT2)) =
@@ -123,7 +148,7 @@ typeOf ctx = go
          else err fi "pack: doesn't match declared type"
     go (TPack fi _ _ _) = err fi "pack: existential type expected"
     go (TUnpack fi tyX x t1 t2) =
-      let tyT1 = typeOf ctx t1
+      let tyT1 = simpleTypeOf t1
       in case tyT1 of
         TySome _tyY tyT11 ->
           let ctx'  = addBinding ctx tyX TyVarBind
@@ -132,35 +157,44 @@ typeOf ctx = go
           in typeShift (-2) tyT2
         _ -> err fi "unpack: existential type expected"
     go (Fix fi t) =
-      case simplifyType ctx $ typeOf ctx t of
+      case simpleTypeOf t of
         (TyArr ty ty') ->
           if typeEqv ctx ty ty'
           then ty'
           else err fi "fix: domain-incompatible body result"
         _ -> err fi "fix: arrow type expected"
+    go (Tuple _ ts) = TyTuple $ fmap (typeOf ctx) ts
+    go (TupleProj fi tu ti) =
+      case simpleTypeOf tu of
+        (TyTuple tys) ->
+          if ti `typeIs` TyNat
+          then fromMaybe (err fi "!: out of bounds") (tys !! ti)
+          else err fi "!: Nat type expected as right argument"
+        _ -> err fi "!: tuple type expected as left argument"
     go (TTrue _)  = TyBool
     go (TFalse _) = TyBool
     go (TIf fi tcond tt tf) =
-      if typeIs TyBool tcond
+      if tcond `typeIs` TyBool
       then let tytt = typeOf ctx tt
-           in if typeIs tytt tf
+           in if tf `typeIs` tytt
               then tytt
               else err fi "if: arms of conditional have different types"
       else err fi "if: conditional guard is not a boolean"
     go TZero{} = TyNat
     go (TSucc fi t) =
-      if typeIs TyNat t
+      if t `typeIs` TyNat
       then TyNat
       else err fi "succ: argument must be of type Nat"
     go (TPred fi t) =
-      if typeIs TyNat t
+      if t `typeIs` TyNat
       then TyNat
       else err fi "pred: argument must be of type Nat"
     go (TIsZero fi t) =
-      if typeIs TyNat t
+      if t `typeIs` TyNat
       then TyBool
       else err fi "iszero: argument must be of type Nat"
-    typeIs ty t = typeEqv ctx ty $ typeOf ctx t
+    typeIs t ty = typeEqv ctx ty $ typeOf ctx t
+    simpleTypeOf = simplifyType ctx . typeOf ctx
 
 typeEqv :: Context -> Type -> Type -> Bool
 typeEqv ctx ty1 ty2 = go ty1' ty2'
@@ -175,6 +209,9 @@ typeEqv ctx ty1 ty2 = go ty1' ty2'
       = typeEqv ctx ty11 ty21 && typeEqv ctx ty12 ty22
     go (TySome tyX ty11) (TySome _ ty21) = highOrdEqv tyX ty11 ty21
     go (TyAll tyX ty11) (TyAll _ ty21) = highOrdEqv tyX ty11 ty21
+    go (TyTuple tys) (TyTuple tys') = and $ zipWith (typeEqv ctx) tys tys'
+    go (TyTuple _) _ = False
+    go _ (TyTuple _) = False
     go TyBool TyBool = True
     go TyBool _ = False
     go _ TyBool = False
@@ -270,3 +307,9 @@ showBinding ctx = go
 showType :: Context -> Type -> String
 showType _ = show -- FIXME: pretty-print!
 
+
+infixl 9  !! -- safe indexing
+(!!) :: [a] -> Term -> Maybe a
+(x:_) !! TZero{} = Just x
+(_:xs) !! (TSucc _ n) = xs !! n
+_ !! _ = Nothing

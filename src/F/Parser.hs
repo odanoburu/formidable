@@ -70,6 +70,7 @@ typeAtom = parens typeP
   <|> (TyBool <$ pKeyword "Bool" <?> "Bool type")
   <|> (TyNat <$ pKeyword "Nat" <?> "Nat type")
   <|> (TyVar pix pix <$> tyIdentifier <?> "type variable")
+  <|> (TyTuple <$> tupleOf typeP)
   where
     allTy = TyAll
       <$> ((pKeyword "Forall" <|> symbol_ "∀") *> tyIdentifier <* period)
@@ -96,6 +97,7 @@ termAtom = parens term
   <|> try var
   -- add-ons
   <|> fix
+  <|> tuple
   <|> bool
   <|> tIf
   <|> nat
@@ -123,6 +125,9 @@ termAtom = parens term
     fix = Fix
       <$> info
       <*> (pKeyword "fix" *> term)
+    tuple = Tuple
+      <$> info
+      <*> tupleOf term
     bool = TTrue <$> info <* symbol "#t" <|> TFalse <$> info <* symbol "#f"
     tIf = TIf <$> info
       <*> (pKeyword "if" *> term)
@@ -145,8 +150,19 @@ termAtom = parens term
 term :: Parser Term
 term = makeExprParser termAtom table
   where
-    table = [ [ InfixL (App <$> info <* symbol "")
-              , Postfix ((\i tyT t -> TApp i t tyT) <$> info <*> brackets typeP) ] ]
+    table = [ [ -- FIXME: application has highest precedence of all,
+                -- but then we try to parse ! operator and fail
+                -- because it sees a space and thinks its an
+                -- application…
+                InfixL (App <$> info <* symbol "" <* notFollowedBy "!")
+              , InfixL (TupleProj <$> info <* symbol "!")
+              , Postfix ((\i tyT t -> TApp i t tyT) <$> info <*> brackets typeP)
+              ]
+            ]
+
+
+tupleOf :: Parser a -> Parser [a]
+tupleOf p = between (symbol "<") (symbol ">") (sepEndBy p comma)
 
 
 ---

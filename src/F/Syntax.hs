@@ -1,5 +1,6 @@
 {-# LANGUAGE StrictData #-}
 module F.Syntax (
+  (!!),
   Command(..), Info(..), Type(..), Term(..), Binding(..), Context(..),
   TopLevel(..),
   addName,
@@ -48,6 +49,8 @@ data Type
   | TyArr Type Type       -- type of functions
   | TyAll String Type     -- universal type
   | TySome String Type    -- existential type
+  -- add-ons
+  | TyTuple [Type]
   deriving (Eq, Show)
 
 
@@ -63,6 +66,8 @@ data Term
   | TUnpack Info String String Term Term  -- unpacking
 -- add-ons
   | Fix Info Term
+  | Tuple Info [Term]
+  | TupleProj Info Term Term
   | TTrue Info
   | TFalse Info
   | TIf Info Term Term Term
@@ -123,6 +128,7 @@ tymap onVar = go
     go c (TyVar x n tn) = onVar c x n tn
     go c (TyAll tyX tyT2) = TyAll tyX $ go (c+1) tyT2
     go c (TySome tyX tyT2) = TySome tyX $ go (c+1) tyT2
+    go c (TyTuple tys) = TyTuple $ fmap (go c) tys
 
 
 typeShiftAbove :: Int -> Int -> Type -> Type
@@ -164,6 +170,8 @@ tmmap onVar onType = go
     go c (TUnpack fi tyX x t1 t2) =
       TUnpack fi tyX x (go c t1) (go (c+2) t2)
     go c (Fix fi t) = Fix fi $ go c t
+    go c (Tuple fi ts) = Tuple fi $ fmap (go c) ts
+    go c (TupleProj fi tu ti) = TupleProj fi (go c tu) (go c ti)
     go _ t@TTrue{} = t
     go _ f@TFalse{} = f
     go c (TIf fi tcond tt tf) = TIf fi (go c tcond) (go c tt) (go c tf)

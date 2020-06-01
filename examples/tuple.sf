@@ -1,0 +1,8 @@
+<> ;  // empty tuple
+<pred 1, #t> ;  // non-empty tuple
+<0, lambda x:Bool. #t, > ;  // you can have a trailing comma if you want to
+
+// indexing
+<#t> ! 0 ;  // is zero-based
+<#t, 1>!1 ;
+<λx:Nat. succ x, 0> ! 0 1;

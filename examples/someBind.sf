@@ -1,2 +1,10 @@
 p = {*Bool, #t} as Exists X, X ;
 
+counterADT =
+   {*Nat, <1, λi:Nat. i, λi:Nat. succ i>}
+   as Exists Counter, <Counter, Counter -> Nat, Counter -> Counter> ;
+
+let {Counter, counter} = counterADT
+// without let bindings or records this is pretty hard to read, but oh
+// well…
+in (counter ! 1) (counter ! 2 (counter ! 0)) ;
