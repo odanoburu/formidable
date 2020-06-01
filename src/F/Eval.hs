@@ -35,6 +35,7 @@ isVal _ Var{} = False
 isVal _ App{} = False
 isVal _ TApp{} = False
 isVal _ TUnpack{} = False
+isVal _ Fix{} = False
 isVal _ TIf{} = False
 isVal _ TIsZero{} = False
 
@@ -62,6 +63,9 @@ eval1 ctx = go
       eval1 ctx t1 >>= \t1' -> Just $ TUnpack fi tyX x t1' t2
     go (TPack fi tyT1 t2 tyT3) = eval1 ctx t2
       >>= \t2' -> Just $ TPack fi tyT1 t2' tyT3
+    go t@(Fix _ (Abs _ _ _ body)) =
+      Just $ termSubstTop t body
+    go (Fix fi t) = eval1 ctx t >>= Just . Fix fi
     go TTrue{} = Nothing
     go TFalse{} = Nothing
     go (TIf _ TTrue{} tt _) = Just tt
@@ -96,8 +100,8 @@ typeOf ctx = go
         TyArr tyT11 tyT12 ->
           if typeEqv ctx tyT2 tyT11
           then tyT12
-          else err fi "parameter type mismatch"
-        _ -> err fi "arrow type expected"
+          else err fi "app: parameter type mismatch"
+        _ -> err fi "app: arrow type expected"
     go (TAbs _fi tyX t2) =
       let ctx' = addBinding ctx tyX TyVarBind
           tyT2 = typeOf ctx' t2
@@ -106,14 +110,14 @@ typeOf ctx = go
       let tyT1 = typeOf ctx t1
       in case simplifyType ctx tyT1 of
         TyAll _ tyT12 -> typeSubstTop tyT2 tyT12
-        _ -> err fi "universal type expected"
+        _ -> err fi "app: universal type expected"
     go (TPack fi tyT1 t2 tyT@(TySome _tyY tyT2)) =
       let tyU  = typeOf ctx t2
           tyU' = typeSubstTop tyT1 tyT2
       in if typeEqv ctx tyU tyU'
          then tyT
-         else err fi "doesn't match declared type"
-    go (TPack fi _ _ _) = err fi "existential type expected"
+         else err fi "pack: doesn't match declared type"
+    go (TPack fi _ _ _) = err fi "pack: existential type expected"
     go (TUnpack fi tyX x t1 t2) =
       let tyT1 = typeOf ctx t1
       in case tyT1 of
@@ -122,7 +126,14 @@ typeOf ctx = go
               ctx'' = addBinding ctx' x (VarBind tyT11)
               tyT2  = typeOf ctx'' t2
           in typeShift (-2) tyT2
-        _ -> err fi "existential type expected"
+        _ -> err fi "unpack: existential type expected"
+    go (Fix fi t) =
+      case simplifyType ctx $ typeOf ctx t of
+        (TyArr ty ty') ->
+          if typeEqv ctx ty ty'
+          then ty'
+          else err fi "fix: domain-incompatible body result"
+        _ -> err fi "fix: arrow type expected"
     go (TTrue _)  = TyBool
     go (TFalse _) = TyBool
     go (TIf fi tcond tt tf) =
@@ -130,17 +141,17 @@ typeOf ctx = go
       then let tytt = typeOf ctx tt
            in if typeEqv ctx tytt $ typeOf ctx tf
               then tytt
-              else err fi "arms of conditional have different types"
-      else err fi "conditional guard is not a boolean"
+              else err fi "if: arms of conditional have different types"
+      else err fi "if: conditional guard is not a boolean"
     go TZero{} = TyNat
     go (TSucc fi t) =
       if typeEqv ctx (typeOf ctx t) TyNat
       then TyNat
-      else err fi "argument of successor be of type Nat"
+      else err fi "succ: argument must be of type Nat"
     go (TIsZero fi t) =
       if typeEqv ctx (typeOf ctx t) TyNat
       then TyBool
-      else err fi "argument of iszero must be of type Nat"
+      else err fi "iszero: argument must be of type Nat"
 
 
 typeEqv :: Context -> Type -> Type -> Bool

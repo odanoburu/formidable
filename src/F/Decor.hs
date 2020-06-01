@@ -41,6 +41,9 @@ decor (TUnpack fi tyX x t1 t2) ctx =
       t2' = decor t2 ctx''
   in TUnpack fi tyX x t1' t2'
 -- add-ons
+decor (Fix fi t) ctx =
+  let t' = decor t ctx
+  in Fix fi t'
 decor t@TTrue{} _ = t
 decor f@TFalse{} _ = f
 decor (TIf fi tcond tt tf) ctx =

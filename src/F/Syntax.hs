@@ -62,6 +62,7 @@ data Term
   | TPack Info Type Term Type             -- packing
   | TUnpack Info String String Term Term  -- unpacking
 -- add-ons
+  | Fix Info Term
   | TTrue Info
   | TFalse Info
   | TIf Info Term Term Term
@@ -161,8 +162,9 @@ tmmap onVar onType = go
       TPack fi (onType c tyT1) (go c t2) (onType c tyT3)
     go c (TUnpack fi tyX x t1 t2) =
       TUnpack fi tyX x (go c t1) (go (c+2) t2)
-    go _ (TTrue fi) = TTrue fi
-    go _ (TFalse fi) = TFalse fi
+    go c (Fix fi t) = Fix fi $ go c t
+    go _ t@TTrue{} = t
+    go _ f@TFalse{} = f
     go c (TIf fi tcond tt tf) = TIf fi (go c tcond) (go c tt) (go c tf)
     go _ z@TZero{} = z
     go _ s@TSucc{} = s

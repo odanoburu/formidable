@@ -94,6 +94,7 @@ termAtom = parens term
   -- when this goes wrong we have to backtrack
   <|> try var
   -- add-ons
+  <|> fix
   <|> bool
   <|> tIf
   <|> nat
@@ -116,6 +117,9 @@ termAtom = parens term
       <*> (comma *> termIdentifier <* rcurly)
       <*> (equal *> term <* pKeyword "in")
       <*> term
+    fix = Fix
+      <$> info
+      <*> (pKeyword "fix" *> term)
     bool = TTrue <$> info <* symbol "#t" <|> TFalse <$> info <* symbol "#f"
     tIf = TIf <$> info
       <*> (pKeyword "if" *> term)
@@ -142,7 +146,7 @@ keywords :: Set String
 keywords
   = S.fromList [
   "Forall", "Exists", "λ", "lambda", "Λ", "Lambda", "in",
-  "let", "as", "if", "then", "else", "isZero"
+  "let", "as", "fix", "if", "then", "else", "isZero"
   ]
 
 termIdentifier :: Parser String
