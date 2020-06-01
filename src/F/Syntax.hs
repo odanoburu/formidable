@@ -22,6 +22,8 @@ module F.Syntax (
 
 import Data.List (findIndex)
 import Data.Semigroup (Sum(..))
+import Data.Text.Prettyprint.Doc ((<>), (<+>), Doc(..), Pretty(..),
+                                  align, encloseSep, flatAlt, group, softline)
 --import Debug.Trace (trace)
 import Prelude hiding ((!!))
 
@@ -288,3 +290,32 @@ infixl 9  !! -- safe indexing
 (x:_) !! 0 = Just x
 (_:xs) !! n = xs !! (n-1)
 [] !! _ = Nothing
+
+
+printType :: Context -> Type -> Doc a
+printType = go
+  where
+    go ctx (TyAll tyX ty) =
+      let (ctx', tyX') = freshName ctx tyX
+      in align
+      $ "All" <+> pretty tyX' <> "." <> softline
+      <> printType ctx' ty
+    go ctx (TyArr tyL tyR) = align
+      $ printType ctx tyL <+> "->"
+      <> softline <> printType ctx tyR
+    go _ (TyVar _ _ x) = pretty x
+    go _ (TyId b) = pretty b
+    go ctx (TyTuple tys) = group
+      . encloseSep (flatAlt "< " "<")
+                   (flatAlt " >" ">")
+                   ", " $ fmap (printType ctx) tys
+    go _ TyBool = "Bool"
+    go _ TyNat = "Nat"
+         
+freshName :: Context -> String -> (Context, String)
+freshName c@(Ctx ctx (Sum n)) x =
+  if isBound
+  then freshName c $ x ++ "'"
+  else (Ctx ((x, NameBind):ctx) (Sum $ n+1), x)
+  where
+    isBound = x `elem` fmap fst ctx

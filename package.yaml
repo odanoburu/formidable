@@ -32,6 +32,7 @@ dependencies:
 - megaparsec == 7.*
 - mtl == 2.2.*
 - parser-combinators == 1.*
+- prettyprinter == 1.2.*
 - text == 1.2.*
 
 library:
