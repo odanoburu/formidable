@@ -7,7 +7,7 @@ module F.Lib
 
 
 import F.Syntax ( Binding(..), Command(..), Context(..), Term(..), Type(..)
-                , addBinding, showError, termShift )
+                , addBinding, showError, prettyBinding, showTermType, termShift)
 import F.Parser (parseCommands)
 import F.Decor (decor)
 import F.Eval (InContext(..), eval, evalBinding, simplifyType, typeOf)
@@ -22,14 +22,19 @@ processCommand ctx (Eval fi t) =
   let t' = decor t ctx
       tyT = typeOf ctx t'
       t'' = eval ctx t'
-      out = unwords [show t'', ":", show tyT]
+      out = showTermType ctx t'' tyT
   in Right $ (out, Eval fi t'') `InCtx` ctx
 processCommand ctx (Bind fi x _bind) =
   case evalBinding ctx _bind of
     Right bind' -> let
-      out = unwords [x, ":", show bind']
+      out = unwords [x, showBinding bind']
       in Right $ (out, Bind fi x bind') `InCtx` addBinding ctx x bind'
     Left err -> Left err
+  where
+    showBinding (TermBind t Nothing)
+      = showBinding . TermBind t . Just
+      $ typeOf ctx t
+    showBinding b = show $ prettyBinding ctx b
 processCommand ctx (SomeBind fi tyX x t) =
   case simplifyType ctx $ typeOf ctx t' of
     TySome _ tyBody ->

@@ -16,14 +16,17 @@ module F.Syntax (
   nameToIndex,
   addBinding,
   getBinding,
+  prettyBinding,
   showError,
+  showTermType,
   ) where
 
 
 import Data.List (findIndex)
 import Data.Semigroup (Sum(..))
-import Data.Text.Prettyprint.Doc ((<>), (<+>), Doc(..), Pretty(..),
-                                  align, encloseSep, flatAlt, group, softline)
+import Data.Text.Prettyprint.Doc ((<>), (<+>), Doc, Pretty(..),
+                                  align, encloseSep, flatAlt, group,
+                                  softline)
 --import Debug.Trace (trace)
 import Prelude hiding ((!!))
 
@@ -292,26 +295,36 @@ infixl 9  !! -- safe indexing
 [] !! _ = Nothing
 
 
-printType :: Context -> Type -> Doc a
-printType = go
+prettyType :: Context -> Type -> Doc a
+prettyType = go
   where
     go ctx (TyAll tyX ty) =
       let (ctx', tyX') = freshName ctx tyX
       in align
       $ "All" <+> pretty tyX' <> "." <> softline
-      <> printType ctx' ty
+      <> prettyType ctx' ty
     go ctx (TyArr tyL tyR) = align
-      $ printType ctx tyL <+> "->"
-      <> softline <> printType ctx tyR
+      $ prettyType ctx tyL <+> "->"
+      <> softline <> prettyType ctx tyR
     go _ (TyVar _ _ x) = pretty x
     go _ (TyId b) = pretty b
-    go ctx (TyTuple tys) = group
-      . encloseSep (flatAlt "< " "<")
-                   (flatAlt " >" ">")
-                   ", " $ fmap (printType ctx) tys
+    go ctx (TyTuple tys) = prettyTuple $ fmap (prettyType ctx) tys
     go _ TyBool = "Bool"
     go _ TyNat = "Nat"
-         
+    go ctx (TySome tyX ty) =
+      let (ctx', tyX') = freshName ctx tyX
+      in align
+      $ "{Exists" <+> pretty tyX' <> "," <> softline
+      <> prettyType ctx' ty <> "}"
+
+
+prettyTuple :: [Doc a] -> Doc a
+prettyTuple = group
+  . encloseSep (flatAlt "< " "<")
+               (flatAlt " >" ">")
+               ", "
+
+
 freshName :: Context -> String -> (Context, String)
 freshName c@(Ctx ctx (Sum n)) x =
   if isBound
@@ -319,3 +332,74 @@ freshName c@(Ctx ctx (Sum n)) x =
   else (Ctx ((x, NameBind):ctx) (Sum $ n+1), x)
   where
     isBound = x `elem` fmap fst ctx
+
+
+prettyTerm :: Context -> Term -> Doc a
+prettyTerm ctx (Abs _ x ty t) =
+  let (ctx', x') = freshName ctx x
+  in align
+  $ "λ" <+> pretty x' <> ":" <> prettyType ctx ty <> "."
+  <> softline <> prettyTerm ctx' t
+prettyTerm ctx (Fix _ t)
+  = align
+  $ "fix" <+> prettyTerm ctx t
+prettyTerm ctx (TIf _ tcond tt tf)
+  = align
+  $ "if" <+> prettyTerm ctx tcond
+  <+> "then" <+> prettyTerm ctx tt
+  <+> "else" <+> prettyTerm ctx tf
+prettyTerm ctx (TUnpack _ tyX x t1 t2) =
+  let (ctx', tyX') = freshName ctx tyX
+      (ctx'', x') = freshName ctx' x
+  in align
+  $ "let {" <> pretty tyX' <> "," <> pretty x'
+  <> "} =" <+> prettyTerm ctx t1 <+> "in"
+  <+> prettyTerm ctx'' t2
+prettyTerm ctx (TAbs _ x t) =
+  let (ctx', x') = freshName ctx x
+  in align
+  $ "Λ" <+> pretty x' <> "."
+  <> softline <> prettyTerm ctx' t
+prettyTerm ctx (App _ tf tx)
+  = align
+  $ prettyTerm ctx tf <+> prettyTerm ctx tx
+prettyTerm ctx (TPred _ t) = "pred" <+> prettyTerm ctx t
+prettyTerm ctx (TIsZero _ t) = "isZero" <+> prettyTerm ctx t
+prettyTerm ctx (TApp _ t tyS)
+  = align
+  $ prettyTerm ctx t
+  <+> "[" <> prettyType ctx tyS <> "]"
+prettyTerm ctx (TupleProj _ tu ti) =
+  prettyTerm ctx tu <+> "!" <+> prettyTerm ctx ti
+prettyTerm _ (Var _ _ _ vn) = pretty vn
+prettyTerm ctx (Tuple _ ts) = prettyTuple $ fmap (prettyTerm ctx) ts
+prettyTerm _ TTrue{} = "#t"
+prettyTerm _ TFalse{} = "#f"
+prettyTerm _ TZero{} = "0"
+prettyTerm ctx (TSucc _ ts) = go (1 :: Int) ts
+  where
+    go n TZero{} = pretty n
+    go n (TSucc _ t) = go (n+1) t
+    go _ t = "(succ" <+> prettyTerm ctx t <> ")"
+prettyTerm ctx (TPack _ ty t ty')
+  = align
+  $ "{*" <> prettyType ctx ty <> "," <> softline
+  <> prettyTerm ctx t <> "}"
+  <+> "as" <+> prettyType ctx ty'
+
+
+showTermType :: Context -> Term -> Type -> String
+showTermType ctx t ty
+  = show
+  $ prettyTerm ctx t <+> ":" <+> prettyType ctx ty
+
+
+prettyBinding :: Context -> Binding -> Doc a
+prettyBinding ctx = go
+  where
+    go NameBind = mempty
+    go TyVarBind = mempty
+    go (VarBind ty) = ":" <+> prettyType ctx ty
+    go (TypeBind _) = ":: *"
+    go (TermBind _ Nothing) = mempty
+    go (TermBind _ (Just ty)) = ":" <+> prettyType ctx ty
