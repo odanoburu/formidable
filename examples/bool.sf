@@ -1,0 +1,5 @@
+#t ;
+#f ;
+
+not = λb:Bool. if b then #f else #t ;
+
