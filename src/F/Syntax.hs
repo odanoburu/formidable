@@ -296,26 +296,28 @@ infixl 9  !! -- safe indexing
 
 
 prettyType :: Context -> Type -> Doc a
-prettyType = go
-  where
-    go ctx (TyAll tyX ty) =
-      let (ctx', tyX') = freshName ctx tyX
+prettyType ctx (TyAll tyX ty) =
+  let (ctx', tyX') = freshName ctx tyX
       in align
       $ "∀" <+> pretty tyX' <> "." <> softline
       <> prettyType ctx' ty
-    go ctx (TyArr tyL tyR) = align
-      $ prettyType ctx tyL <+> "->"
-      <> softline <> prettyType ctx tyR
-    go _ (TyVar _ _ x) = pretty x
-    go _ (TyId b) = pretty b
-    go ctx (TyTuple tys) = prettyTuple $ fmap (prettyType ctx) tys
-    go _ TyBool = "Bool"
-    go _ TyNat = "Nat"
-    go ctx (TySome tyX ty) =
-      let (ctx', tyX') = freshName ctx tyX
+prettyType ctx' tyT = arrowType ctx' tyT
+  where
+    arrowType ctx (TyArr tyL tyR) = align
+      $ atomicType ctx tyL <+> "->"
+      <> softline <> arrowType ctx tyR
+    arrowType ctx ty = atomicType ctx ty
+    atomicType _ (TyVar _ _ x) = pretty x
+    atomicType _ (TyId b) = pretty b
+    atomicType ctx (TyTuple tys) = prettyTuple $ fmap (prettyType ctx) tys
+    atomicType _ TyBool = "Bool"
+    atomicType _ TyNat = "Nat"
+    atomicType ctx (TySome tyX ty) =
+      let (ctx'', tyX') = freshName ctx tyX
       in align
       $ "∃" <+> pretty tyX' <> "," <> softline
-      <> prettyType ctx' ty <> ""
+      <> prettyType ctx'' ty <> ""
+    atomicType ctx ty = "(" <> prettyType ctx ty <> ")"
 
 
 prettyTuple :: [Doc a] -> Doc a
@@ -360,32 +362,37 @@ prettyTerm ctx (TAbs _ x t) =
   in align
   $ "Λ" <+> pretty x' <> "."
   <> softline <> prettyTerm ctx' t
-prettyTerm ctx (App _ tf tx)
-  = align
-  $ prettyTerm ctx tf <+> prettyTerm ctx tx
-prettyTerm ctx (TPred _ t) = "pred" <+> prettyTerm ctx t
-prettyTerm ctx (TIsZero _ t) = "isZero" <+> prettyTerm ctx t
-prettyTerm ctx (TApp _ t tyS)
-  = align
-  $ prettyTerm ctx t
-  <+> "[" <> prettyType ctx tyS <> "]"
-prettyTerm ctx (TupleProj _ tu ti) =
-  prettyTerm ctx tu <+> "!" <+> prettyTerm ctx ti
-prettyTerm _ (Var _ _ _ vn) = pretty vn
-prettyTerm ctx (Tuple _ ts) = prettyTuple $ fmap (prettyTerm ctx) ts
-prettyTerm _ TTrue{} = "#t"
-prettyTerm _ TFalse{} = "#f"
-prettyTerm _ TZero{} = "0"
-prettyTerm ctx (TSucc _ ts) = go (1 :: Int) ts
+prettyTerm appCtx appT = appTerm appCtx appT
   where
-    go n TZero{} = pretty n
-    go n (TSucc _ t) = go (n+1) t
-    go _ t = "(succ" <+> prettyTerm ctx t <> ")"
-prettyTerm ctx (TPack _ ty t ty')
-  = align
-  $ "{*" <> prettyType ctx ty <> "," <> softline
-  <> prettyTerm ctx t <> "}"
-  <+> "as" <+> prettyType ctx ty'
+    appTerm ctx (App _ tf tx)
+      = align
+      $ appTerm ctx tf <+> atomicTerm ctx tx
+    appTerm ctx (TPred _ t) = "pred" <+> atomicTerm ctx t
+    appTerm ctx (TIsZero _ t) = "isZero" <+> atomicTerm ctx t
+    appTerm ctx (TApp _ t tyS)
+      = align
+      $ appTerm ctx t
+      <+> "[" <> prettyType ctx tyS <> "]"
+    appTerm ctx t = pathTerm ctx t
+    pathTerm ctx (TupleProj _ tu ti) =
+      atomicTerm ctx tu <+> "!" <+> atomicTerm ctx ti
+    pathTerm ctx t = atomicTerm ctx t
+    atomicTerm _ (Var _ _ _ vn) = pretty vn
+    atomicTerm ctx (Tuple _ ts) = prettyTuple $ fmap (prettyTerm ctx) ts
+    atomicTerm _ TTrue{} = "#t"
+    atomicTerm _ TFalse{} = "#f"
+    atomicTerm _ TZero{} = "0"
+    atomicTerm ctx (TSucc _ ts) = go (1 :: Int) ts
+      where
+        go n TZero{} = pretty n
+        go n (TSucc _ t) = go (n+1) t
+        go _ t = "(succ" <+> atomicTerm ctx t <> ")"
+    atomicTerm ctx (TPack _ ty t ty')
+      = align
+      $ "{*" <> prettyType ctx ty <> "," <> softline
+      <> prettyTerm ctx t <> "}"
+      <+> "as" <+> prettyType ctx ty'
+    atomicTerm ctx t = "(" <> prettyTerm ctx t <> ")"
 
 
 showTermType :: Context -> Term -> Type -> String
@@ -403,3 +410,4 @@ prettyBinding ctx = go
     go (TypeBind _) = ":: *"
     go (TermBind _ Nothing) = mempty
     go (TermBind _ (Just ty)) = ":" <+> prettyType ctx ty
+
