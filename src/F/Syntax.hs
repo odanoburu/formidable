@@ -18,7 +18,9 @@ module F.Syntax (
   getBinding,
   prettyBinding,
   showError,
+  showTerm,
   showTermType,
+  showType,
   ) where
 
 
@@ -71,6 +73,7 @@ data Term
   | TUnpack Info String String Term Term  -- unpacking
 -- add-ons
   | Fix Info Term
+  | Ascribe Info Term Type
   | Tuple Info [Term]
   | TupleProj Info Term Term
   | TTrue Info
@@ -174,6 +177,7 @@ tmmap onVar onType = go
       TPack fi (onType c tyT1) (go c t2) (onType c tyT3)
     go c (TUnpack fi tyX x t1 t2) =
       TUnpack fi tyX x (go c t1) (go (c+2) t2)
+    go c (Ascribe fi t ty) = Ascribe fi (go c t) (onType c ty)
     go c (Fix fi t) = Fix fi $ go c t
     go c (Tuple fi ts) = Tuple fi $ fmap (go c) ts
     go c (TupleProj fi tu ti) = TupleProj fi (go c tu) (go c ti)
@@ -399,6 +403,13 @@ showTermType :: Context -> Term -> Type -> String
 showTermType ctx t ty
   = show
   $ prettyTerm ctx t <+> ":" <+> prettyType ctx ty
+
+
+showTerm :: Context -> Term -> String
+showTerm ctx t = show $ prettyTerm ctx t
+
+showType :: Context -> Type -> String
+showType ctx ty = show $ prettyType ctx ty 
 
 
 prettyBinding :: Context -> Binding -> Doc a

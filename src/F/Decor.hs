@@ -41,6 +41,10 @@ decor (TUnpack fi tyX x t1 t2) ctx =
       t2' = decor t2 ctx''
   in TUnpack fi tyX x t1' t2'
 -- add-ons
+decor (Ascribe fi t ty) ctx =
+  let t' = decor t ctx
+      ty' = decorT ty ctx
+  in Ascribe fi t' ty'
 decor (Fix fi t) ctx =
   let t' = decor t ctx
   in Fix fi t'
