@@ -12,10 +12,12 @@ module F.Eval
 
 
 import F.Syntax (Type(..), Term(..), Binding(..), Context(..),
-                 addBinding, addName, dummyInfo, getBinding, getTypeFromContext,
+                 addBinding, addName, dummyInfo, err,
+                 getBinding, getTypeFromContext,
+                 showTerm, showType,
                  termShift, termSubstTop, tytermSubstTop,
-                 typeShift, typeSubstTop,
-                 err)
+                 typeShift, typeSubstTop
+                 )
 import F.Decor (decor , decorT)
 
 
@@ -39,6 +41,7 @@ isVal _ Var{} = False
 isVal _ App{} = False
 isVal _ TApp{} = False
 isVal _ TUnpack{} = False
+isVal _ Ascribe{} = False
 isVal _ FixOp{} = True
 isVal _ Fix{} = False
 isVal _ TupleProj{} = False
@@ -73,6 +76,9 @@ eval1 ctx = go
       eval1 ctx t1 >>= \t1' -> Just $ TUnpack fi tyX x t1' t2
     go (TPack fi tyT1 t2 tyT3) = eval1 ctx t2
       >>= \t2' -> Just $ TPack fi tyT1 t2' tyT3
+    go (Ascribe _ t _)
+      | isVal ctx t = Just t
+    go (Ascribe fi t ty) = eval1 ctx t >>= Just . flip (Ascribe fi) ty
     go FixOp{} = Nothing
     go t@(Fix _ (Abs _ _ _ body)) =
       Just $ termSubstTop t body
@@ -163,6 +169,15 @@ typeOf ctx = go
               tyT2  = typeOf ctx'' t2
           in typeShift (-2) tyT2
         _ -> err fi "unpack: existential type expected"
+    go (Ascribe fi t ty) =
+      let tyT = simpleTypeOf t
+      in if typeEqv ctx tyT ty
+         then ty
+         else err fi
+              $ unlines [ "as-type: expected type " ++ showType ctx ty
+                        , "for term " ++ showTerm ctx t
+                        , "found type", showType ctx tyT, "instead"
+                        ]
     go (FixOp mTy) = fixType mTy
     go (Fix fi t) =
       case simpleTypeOf t of
@@ -320,10 +335,6 @@ showBinding ctx = go
           Nothing -> show $ typeOf ctx t `InCtx` ctx
           Just tyT -> show $ tyT `InCtx` ctx
     go (TypeBind tyT) = unwords ["=", showType ctx tyT]
-
-
-showType :: Context -> Type -> String
-showType _ = show -- FIXME: pretty-print!
 
 
 infixl 9  !! -- safe indexing

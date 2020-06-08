@@ -1,5 +1,5 @@
 # -*- mode: org -*-
-#+TITLE: formidable — system F implemented in Haskell
+#+TITLE: formidable — system F interpreter implemented in Haskell
 
 very much a WIP.
 
