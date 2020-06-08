@@ -301,7 +301,7 @@ prettyType = go
     go ctx (TyAll tyX ty) =
       let (ctx', tyX') = freshName ctx tyX
       in align
-      $ "All" <+> pretty tyX' <> "." <> softline
+      $ "∀" <+> pretty tyX' <> "." <> softline
       <> prettyType ctx' ty
     go ctx (TyArr tyL tyR) = align
       $ prettyType ctx tyL <+> "->"
@@ -314,8 +314,8 @@ prettyType = go
     go ctx (TySome tyX ty) =
       let (ctx', tyX') = freshName ctx tyX
       in align
-      $ "{Exists" <+> pretty tyX' <> "," <> softline
-      <> prettyType ctx' ty <> "}"
+      $ "∃" <+> pretty tyX' <> "," <> softline
+      <> prettyType ctx' ty <> ""
 
 
 prettyTuple :: [Doc a] -> Doc a

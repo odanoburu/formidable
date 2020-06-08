@@ -1,5 +1,5 @@
 {-# LANGUAGE StrictData #-}
-module F.Parser (Parser, parseCommands, pix, term, typeP) where
+module F.Parser (Parser, parseCommands, parseTerm, pix, term, typeP) where
 
 
 import F.Syntax ( Binding(..), Command(..), Info(..), Term(..), Type(..))
@@ -34,14 +34,19 @@ type Parser = Parsec SyntaxError String
 ---
 -- API
 parseCommands :: FilePath -> String -> Either String [Command]
-parseCommands fp input = bimap errorBundlePretty id
-  $ parse commands fp input
+parseCommands = parseResult commands
 
+parseTerm :: String -> Either String Term
+parseTerm = parseResult term ""
 
 ---
 -- parser
+parseResult :: Parser a -> FilePath -> String -> Either String a
+parseResult p fp input = bimap errorBundlePretty id
+  $ parse (sc *> p <* eof) fp input
+
 commands :: Parser [Command]
-commands = sc *> sepEndBy command semicolon <* eof
+commands = sepEndBy command semicolon
 
 
 command :: Parser Command

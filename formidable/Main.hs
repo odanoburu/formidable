@@ -1,10 +1,10 @@
 module Main where
 
 
-import F.Lib (processInput)
-import F.Eval (InContext(..))
+import F.Lib (processInput, parseDecorateTerm)
+import F.Eval (InContext(..), typeOf)
 import F.Parser (parseCommands)
-import F.Syntax (Context(..))
+import F.Syntax (Context(..), showTermType)
 
 --import Control.Monad.IO.Class (liftIO)
 import Data.Char (isSpace)
@@ -78,7 +78,9 @@ runREPL _ = runInputT defaultSettings (loop mempty)
     loop ctx = do
       minput <- getInputLine "formidable> "
       case splitAt 1 . dropWhile isSpace <$> minput of
-        Just (":", metaCommand) -> handleMetaCommand metaCommand
+        Just (":", metaCommand) ->
+          case break (== ' ') metaCommand of
+            (name, arg) -> handleMetaCommand name arg
         Just ("", "") -> loop ctx
         Just (x, xs) ->
           let input = x ++ xs
@@ -92,10 +94,18 @@ runREPL _ = runInputT defaultSettings (loop mempty)
             return ()
         Nothing -> return () -- control-D and stuff
         where
-          handleMetaCommand "exit" = return ()
-          handleMetaCommand "quit" = return ()
-          handleMetaCommand "context" = outputStrLn (show ctx) *> loop ctx
-          handleMetaCommand _ = outputStrLn "Unrecognized command" *> loop ctx
+          handleMetaCommand "e" _ = return ()
+          handleMetaCommand "exit" _ = return ()
+          handleMetaCommand "q" _ = return ()
+          handleMetaCommand "quit" _ = return ()
+          handleMetaCommand "c" t = handleMetaCommand "context" t
+          handleMetaCommand "context" _ = outputStrLn (show ctx) *> loop ctx
+          handleMetaCommand "t" t = handleMetaCommand "type" t
+          handleMetaCommand "type" tStr = case parseDecorateTerm ctx tStr of
+            Left err -> outputStrLn err *> loop ctx
+            Right t -> let ty = typeOf ctx t
+              in outputStrLn (showTermType ctx t ty) *> loop ctx
+          handleMetaCommand _ _ = outputStrLn "Unrecognized command" *> loop ctx
 
 
 main :: IO ()

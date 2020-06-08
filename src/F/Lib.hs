@@ -3,16 +3,18 @@ module F.Lib
       processCommand,
       processCommands,
       processInput,
+      parseDecorateTerm,
     ) where
 
 
 import F.Syntax ( Binding(..), Command(..), Context(..), Term(..), Type(..)
                 , addBinding, showError, prettyBinding, showTermType, termShift)
-import F.Parser (parseCommands)
+import F.Parser (parseCommands, parseTerm)
 import F.Decor (decor)
 import F.Eval (InContext(..), eval, evalBinding, simplifyType, typeOf)
 
 
+import Data.Bifunctor (bimap)
 import Data.List (foldl')
 --import Debug.Trace (trace)
 
@@ -64,5 +66,11 @@ processInput :: Context -> FilePath -> String
   -> Either String (InContext [(String, Command)])
 processInput initCtx fp input
   = parseCommands fp input >>= processCommands initCtx
+
+
+parseDecorateTerm :: Context -> String
+  -> Either String Term
+parseDecorateTerm ctx input = bimap id (`decor` ctx)
+  $ parseTerm input
 
 
