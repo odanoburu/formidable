@@ -1,7 +1,7 @@
 module Main where
 
 
-import F.Lib (processInput, parseDecorateTerm)
+import F.Lib (initialContext, processInput, parseDecorateTerm)
 import F.Eval (InContext(..), typeOf)
 import F.Parser (parseCommands)
 import F.Syntax (Context(..), showTermType)
@@ -72,7 +72,7 @@ cliHeader :: String
 cliHeader = "formidable — system F interpreter."
 
 runREPL :: [FilePath] -> IO ()
-runREPL _ = runInputT defaultSettings (loop mempty)
+runREPL _ = runInputT defaultSettings (loop initialContext)
   where
     loop :: Context -> InputT IO ()
     loop ctx = do
@@ -117,7 +117,7 @@ main = do
   importDirs <- mapM canonicalizePath importDirs'
   case subcommand of
     REPL -> runREPL importDirs
-    Eval what input -> caseInput what input (processInput mempty)
+    Eval what input -> caseInput what input (processInput initialContext)
       >>= either putErr (mapM_ (putStrLn . fst) . reverse . thing)
     Parse what input -> caseInput what input parseCommands
       >>= either putErr print

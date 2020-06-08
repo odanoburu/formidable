@@ -71,6 +71,7 @@ data Term
   | TUnpack Info String String Term Term  -- unpacking
 -- add-ons
   | Fix Info Term
+  | FixOp (Maybe Type)
   | Tuple Info [Term]
   | TupleProj Info Term Term
   | TTrue Info
@@ -174,6 +175,7 @@ tmmap onVar onType = go
       TPack fi (onType c tyT1) (go c t2) (onType c tyT3)
     go c (TUnpack fi tyX x t1 t2) =
       TUnpack fi tyX x (go c t1) (go (c+2) t2)
+    go _ f@FixOp{} = f
     go c (Fix fi t) = Fix fi $ go c t
     go c (Tuple fi ts) = Tuple fi $ fmap (go c) ts
     go c (TupleProj fi tu ti) = TupleProj fi (go c tu) (go c ti)
@@ -340,6 +342,8 @@ prettyTerm ctx (Abs _ x ty t) =
   in align
   $ "λ" <+> pretty x' <> ":" <> prettyType ctx ty <> "."
   <> softline <> prettyTerm ctx' t
+prettyTerm _ (FixOp Nothing) = "fix"
+prettyTerm ctx (FixOp (Just ty)) = "fix" <+> "[" <> prettyType ctx ty <> "]"
 prettyTerm ctx (Fix _ t)
   = align
   $ "fix" <+> prettyTerm ctx t
@@ -371,11 +375,12 @@ prettyTerm ctx (TApp _ t tyS)
   <+> "[" <> prettyType ctx tyS <> "]"
 prettyTerm ctx (TupleProj _ tu ti) =
   prettyTerm ctx tu <+> "!" <+> prettyTerm ctx ti
-prettyTerm _ (Var _ _ _ vn) = pretty vn
+prettyTerm _ (Var _ vn _ _) = pretty vn
 prettyTerm ctx (Tuple _ ts) = prettyTuple $ fmap (prettyTerm ctx) ts
 prettyTerm _ TTrue{} = "#t"
 prettyTerm _ TFalse{} = "#f"
 prettyTerm _ TZero{} = "0"
+-- TODO: catch Succ at App to pretty print well
 prettyTerm ctx (TSucc _ ts) = go (1 :: Int) ts
   where
     go n TZero{} = pretty n

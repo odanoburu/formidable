@@ -1,5 +1,6 @@
 module F.Lib
     (
+      initialContext,
       processCommand,
       processCommands,
       processInput,
@@ -8,10 +9,11 @@ module F.Lib
 
 
 import F.Syntax ( Binding(..), Command(..), Context(..), Term(..), Type(..)
-                , addBinding, showError, prettyBinding, showTermType, termShift)
+                , addBinding, makeContext, showError
+                , prettyBinding, showTermType, termShift)
 import F.Parser (parseCommands, parseTerm)
 import F.Decor (decor)
-import F.Eval (InContext(..), eval, evalBinding, simplifyType, typeOf)
+import F.Eval (InContext(..), eval, evalBinding, fixType, simplifyType, typeOf)
 
 
 import Data.Bifunctor (bimap)
@@ -72,5 +74,10 @@ parseDecorateTerm :: Context -> String
   -> Either String Term
 parseDecorateTerm ctx input = bimap id (`decor` ctx)
   $ parseTerm input
+
+
+initialContext :: Context
+initialContext =
+  makeContext [("fix", TermBind (FixOp Nothing) . Just $ fixType Nothing)]
 
 

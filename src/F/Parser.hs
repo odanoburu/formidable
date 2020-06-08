@@ -101,7 +101,7 @@ termAtom = parens term
   -- when this goes wrong we have to backtrack
   <|> try var
   -- add-ons
-  <|> fix
+  -- <|> fix
   <|> tuple
   <|> bool
   <|> tIf
@@ -127,9 +127,9 @@ termAtom = parens term
       <*> (comma *> termIdentifier <* rcurly)
       <*> (equal *> term <* pKeyword "in")
       <*> term
-    fix = Fix
-      <$> info
-      <*> (pKeyword "fix" *> term)
+    -- fix = Fix
+    --   <$> info
+    --   <*> (pKeyword "fix" *> term)
     tuple = Tuple
       <$> info
       <*> tupleOf term
@@ -176,7 +176,7 @@ keywords :: Set String
 keywords
   = S.fromList [
   "Forall", "Exists", "λ", "lambda", "Λ", "Lambda", "in",
-  "let", "as", "fix", "if", "then", "else", "succ", "pred", "isZero",
+  "let", "as", "if", "then", "else", "succ", "pred", "isZero",
   "Nat", "Bool"
   ]
 
