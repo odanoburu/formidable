@@ -13,6 +13,7 @@ module F.Eval
 import F.Syntax (Type(..), Term(..), Binding(..), Context(..),
                  addBinding, addName, dummyInfo, err,
                  getBinding, getTypeFromContext,
+                 nilType,
                  showTerm, showType,
                  termShift, termSubstTop, tytermSubstTop,
                  typeShift, typeSubstTop
@@ -31,6 +32,8 @@ isVal _ Abs{}    = True
 isVal _ TAbs{}   = True
 isVal ctx (TPack _ _ v _) = isVal ctx v
 isVal ctx (Tuple _ ts) = all (isVal ctx) ts
+isVal _ Nil{} = True
+isVal ctx (Cons _ th tt) = isVal ctx th && isVal ctx tt
 isVal _ TTrue{}  = True
 isVal _ TFalse{} = True
 isVal _ TZero{}  = True
@@ -99,6 +102,10 @@ eval1 ctx = go
       eval1 ctx ti >>= Just . TupleProj fi tu
     go (TupleProj fi tu ti) =
       eval1 ctx tu >>= \tu' -> Just $ TupleProj fi tu' ti
+    go Nil{} = Nothing
+    go (Cons fi th tt)
+      | isVal ctx th = eval1 ctx tt >>= Just . Cons fi th
+    go (Cons _ th _) = eval1 ctx th
     go TTrue{} = Nothing
     go TFalse{} = Nothing
     go (TIf _ TTrue{} tt _) = Just tt
@@ -182,34 +189,47 @@ typeOf ctx = go
     go (TupleProj fi tu ti) =
       case simpleTypeOf tu of
         (TyTuple tys) ->
-          if ti `typeIs` TyNat
+          if fst $ ti `typeIs` TyNat
           then fromMaybe (err fi "!: out of bounds") (tys !! ti)
           else err fi "!: Nat type expected as right argument"
         _ -> err fi "!: tuple type expected as left argument"
+    go Nil{} = nilType ctx
+    go (Cons fi th tt) =
+      case simpleTypeOf tt of
+        TyList ty ->
+          case th `typeIs` ty of
+            (True, thTy) -> TyList thTy
+            (False, thTy)
+              -> err fi $ unlines ["∷: expected type " ++ showType ctx ty
+                                   ++ " for head argument"
+                                  , "found type " ++ showType ctx thTy ++ " instead"]
+        _ -> err fi "∷: list type expected as tail argument"
     go (TTrue _)  = TyBool
     go (TFalse _) = TyBool
     go (TIf fi tcond tt tf) =
-      if tcond `typeIs` TyBool
+      if fst $ tcond `typeIs` TyBool
       then let tytt = typeOf ctx tt
-           in if tf `typeIs` tytt
+           in if fst $ tf `typeIs` tytt
               then tytt
               else err fi "if: arms of conditional have different types"
       else err fi "if: conditional guard is not a boolean"
     go TZero{} = TyNat
     go (TSucc fi t) =
-      if t `typeIs` TyNat
+      if fst $ t `typeIs` TyNat
       then TyNat
       else err fi "succ: argument must be of type Nat"
     go (TPred fi t) =
-      if t `typeIs` TyNat
+      if fst $ t `typeIs` TyNat
       then TyNat
       else err fi "pred: argument must be of type Nat"
     go (TIsZero fi t) =
-      if t `typeIs` TyNat
+      if fst $ t `typeIs` TyNat
       then TyBool
       else err fi "iszero: argument must be of type Nat"
-    typeIs t ty = typeEqv ctx ty $ typeOf ctx t
+    typeIs t ty = let ty' = typeOf ctx t
+      in (typeEqv ctx ty ty', ty')
     simpleTypeOf = simplifyType ctx . typeOf ctx
+
 
 typeEqv :: Context -> Type -> Type -> Bool
 typeEqv ctx ty1 ty2 = go ty1' ty2'
@@ -225,8 +245,11 @@ typeEqv ctx ty1 ty2 = go ty1' ty2'
     go (TySome tyX ty11) (TySome _ ty21) = highOrdEqv tyX ty11 ty21
     go (TyAll tyX ty11) (TyAll _ ty21) = highOrdEqv tyX ty11 ty21
     go (TyTuple tys) (TyTuple tys') = and $ zipWith (typeEqv ctx) tys tys'
-    go (TyTuple _) _ = False
-    go _ (TyTuple _) = False
+    go TyTuple{} _ = False
+    go _ TyTuple{} = False
+    go (TyList ty) (TyList ty') =  typeEqv ctx ty ty'
+    go TyList{} _ = False
+    go _ TyList{} = False
     go TyBool TyBool = True
     go TyBool _ = False
     go _ TyBool = False

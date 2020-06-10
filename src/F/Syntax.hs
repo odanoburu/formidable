@@ -7,6 +7,7 @@ module F.Syntax (
   dummyInfo,
   err,
   makeContext,
+  nilType,
   termSubstTop,
   tytermSubstTop,
   typeSubstTop,
@@ -58,6 +59,7 @@ data Type
   | TySome String Type    -- existential type
   -- add-ons
   | TyTuple [Type]
+  | TyList Type
   deriving (Eq, Show)
 
 
@@ -76,6 +78,8 @@ data Term
   | Ascribe Info Term Type
   | Tuple Info [Term]
   | TupleProj Info Term Term
+  | Nil Info
+  | Cons Info Term Term
   | TTrue Info
   | TFalse Info
   | TIf Info Term Term Term
@@ -137,6 +141,7 @@ tymap onVar = go
     go c (TyAll tyX tyT2) = TyAll tyX $ go (c+1) tyT2
     go c (TySome tyX tyT2) = TySome tyX $ go (c+1) tyT2
     go c (TyTuple tys) = TyTuple $ fmap (go c) tys
+    go c (TyList ty) = TyList $ go c ty
 
 
 typeShiftAbove :: Int -> Int -> Type -> Type
@@ -181,6 +186,8 @@ tmmap onVar onType = go
     go c (Fix fi t) = Fix fi $ go c t
     go c (Tuple fi ts) = Tuple fi $ fmap (go c) ts
     go c (TupleProj fi tu ti) = TupleProj fi (go c tu) (go c ti)
+    go _ n@Nil{} = n
+    go c (Cons fi th tt) = Cons fi (go c th) (go c tt)
     go _ t@TTrue{} = t
     go _ f@TFalse{} = f
     go c (TIf fi tcond tt tf) = TIf fi (go c tcond) (go c tt) (go c tf)
@@ -299,6 +306,19 @@ infixl 9  !! -- safe indexing
 [] !! _ = Nothing
 
 
+freshName :: Context -> String -> (Context, String)
+freshName c@(Ctx ctx (Sum n)) x =
+  if isBound
+  then freshName c $ x ++ "'"
+  else (Ctx ((x, NameBind):ctx) (Sum $ n+1), x)
+  where
+    isBound = x `elem` fmap fst ctx
+
+
+nilType :: Context -> Type
+nilType ctx = let tyX = snd $ freshName ctx "X"
+  in TyAll tyX (TyVar 0 1 tyX)
+
 prettyType :: Context -> Type -> Doc a
 prettyType ctx (TyAll tyX ty) =
   let (ctx', tyX') = freshName ctx tyX
@@ -329,15 +349,6 @@ prettyTuple = group
   . encloseSep (flatAlt "< " "<")
                (flatAlt " >" ">")
                ", "
-
-
-freshName :: Context -> String -> (Context, String)
-freshName c@(Ctx ctx (Sum n)) x =
-  if isBound
-  then freshName c $ x ++ "'"
-  else (Ctx ((x, NameBind):ctx) (Sum $ n+1), x)
-  where
-    isBound = x `elem` fmap fst ctx
 
 
 prettyTerm :: Context -> Term -> Doc a

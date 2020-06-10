@@ -55,6 +55,11 @@ decor (TupleProj fi tu ti) ctx =
   let tu' = decor tu ctx
       ti' = decor ti ctx
   in TupleProj fi tu' ti'
+decor n@Nil{} _ = n
+decor (Cons fi th tt) ctx =
+  let th' = decor th ctx
+      tt' = decor tt ctx
+  in Cons fi th' tt'
 decor t@TTrue{} _ = t
 decor f@TFalse{} _ = f
 decor (TIf fi tcond tt tf) ctx =
@@ -95,3 +100,6 @@ decorT (TySome tvn ty) ctx =
 decorT (TyTuple tys) ctx =
   let tys' = fmap (`decorT` ctx) tys
   in TyTuple tys'
+decorT (TyList ty) ctx =
+  let ty' = decorT ty ctx
+  in TyList ty'

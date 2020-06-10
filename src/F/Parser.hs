@@ -161,6 +161,7 @@ term = makeExprParser termAtom table
                 -- application…
                 InfixL (App <$> info <* symbol "" <* notFollowedBy "!")
               , InfixL (TupleProj <$> info <* symbol "!")
+              , InfixR (Cons <$> info <* (symbol "∷" <|> symbol "::"))
               , Postfix ((\i tyT t -> TApp i t tyT) <$> info <*> brackets typeP)
               , Postfix ((\i ty t -> Ascribe i t ty)
                          <$> info <*> (symbol "as" *> typeP))

@@ -1,5 +1,6 @@
 module F.Lib
     (
+      initialContext,
       processCommand,
       processCommands,
       processInput,
@@ -8,7 +9,8 @@ module F.Lib
 
 
 import F.Syntax ( Binding(..), Command(..), Context(..), Term(..), Type(..)
-                , addBinding, showError, prettyBinding, showTermType, termShift)
+                , addBinding, dummyInfo, makeContext, nilType, showError
+                , prettyBinding, showTermType, termShift)
 import F.Parser (parseCommands, parseTerm)
 import F.Decor (decor)
 import F.Eval (InContext(..), eval, evalBinding, simplifyType, typeOf)
@@ -74,3 +76,7 @@ parseDecorateTerm ctx input = bimap id (`decor` ctx)
   $ parseTerm input
 
 
+initialContext :: Context
+initialContext =
+  makeContext [ ("nil", TermBind (Nil dummyInfo) $ Just (nilType mempty))
+              ]
