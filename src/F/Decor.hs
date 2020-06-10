@@ -45,6 +45,7 @@ decor (Ascribe fi t ty) ctx =
   let t' = decor t ctx
       ty' = decorT ty ctx
   in Ascribe fi t' ty'
+decor f@FixOp{} _ = f
 decor (Fix fi t) ctx =
   let t' = decor t ctx
   in Fix fi t'

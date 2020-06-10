@@ -3,3 +3,9 @@ id = Lambda X. lambda x:X. x ;
 idBool = id [Bool] ;
 
 idBool #t ;
+
+const = ΛX.ΛY.λx:X.λy:Y. x ;
+
+constNat = const [Nat] ;
+
+constNat [Bool] 1 #t ;

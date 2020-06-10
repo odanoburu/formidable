@@ -23,7 +23,8 @@ currently there's a way to evaluate a single file or use a REPL.
 
 ** syntax
 
-see the files in the =examples= directory.
+see the files in the =examples= directory (or read the parser
+module :).
 
 
 * testing

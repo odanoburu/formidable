@@ -7,6 +7,7 @@ module F.Syntax (
   dummyInfo,
   err,
   makeContext,
+  fixType,
   nilType,
   termSubstTop,
   tytermSubstTop,
@@ -75,6 +76,7 @@ data Term
   | TUnpack Info String String Term Term  -- unpacking
 -- add-ons
   | Fix Info Term
+  | FixOp (Maybe Type)
   | Ascribe Info Term Type
   | Tuple Info [Term]
   | TupleProj Info Term Term
@@ -183,6 +185,7 @@ tmmap onVar onType = go
     go c (TUnpack fi tyX x t1 t2) =
       TUnpack fi tyX x (go c t1) (go (c+2) t2)
     go c (Ascribe fi t ty) = Ascribe fi (go c t) (onType c ty)
+    go _ f@FixOp{} = f
     go c (Fix fi t) = Fix fi $ go c t
     go c (Tuple fi ts) = Tuple fi $ fmap (go c) ts
     go c (TupleProj fi tu ti) = TupleProj fi (go c tu) (go c ti)
@@ -319,6 +322,17 @@ nilType :: Context -> Type
 nilType ctx = let tyX = snd $ freshName ctx "X"
   in TyAll tyX (TyVar 0 1 tyX)
 
+
+fixType :: Context -> Maybe Type -> Type
+fixType ctx mTy =
+  case mTy of
+    Nothing -> TyAll tyX $ go (TyVar 0 1 tyX)
+    Just ty -> go ty
+  where
+    tyX = snd $ freshName ctx "X"
+    go ty = TyArr (TyArr ty ty) ty
+
+
 prettyType :: Context -> Type -> Doc a
 prettyType ctx (TyAll tyX ty) =
   let (ctx', tyX') = freshName ctx tyX
@@ -357,6 +371,8 @@ prettyTerm ctx (Abs _ x ty t) =
   in align
   $ "λ" <+> pretty x' <> ":" <> prettyType ctx ty <> "."
   <> softline <> prettyTerm ctx' t
+prettyTerm _ (FixOp Nothing) = "fix"
+prettyTerm ctx (FixOp (Just ty)) = "fix" <+> "[" <> prettyType ctx ty <> "]"
 prettyTerm ctx (Fix _ t)
   = align
   $ "fix" <+> prettyTerm ctx t

@@ -79,8 +79,8 @@ termSpec = describe "term" $ do
     Abs d "x" (TySome "X" $ TyVar pix pix "X") (Var d "x" pix pix)
 
   -- add-ons
-  specify "fix" $
-    "fix (lambda x:Bool. #t)" `termParsesAs` Fix d (Abs d "x" TyBool (TTrue d))
+  -- specify "fix" $
+  --   "fix (lambda x:Bool. #t)" `termParsesAs` Fix d (Abs d "x" TyBool (TTrue d))
 
   specify "empty tuple" $
     "<>" `termParsesAs` Tuple d []

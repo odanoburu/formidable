@@ -5,6 +5,7 @@ module F.Eval
     eval,
     eval1,
     evalBinding,
+    fixType,
     simplifyType,
     typeOf,
     ) where
@@ -13,7 +14,7 @@ module F.Eval
 import F.Syntax (Type(..), Term(..), Binding(..), Context(..),
                  addBinding, addName, dummyInfo, err,
                  getBinding, getTypeFromContext,
-                 nilType,
+                 fixType, nilType,
                  showTerm, showType,
                  termShift, termSubstTop, tytermSubstTop,
                  typeShift, typeSubstTop
@@ -44,6 +45,7 @@ isVal _ App{} = False
 isVal _ TApp{} = False
 isVal _ TUnpack{} = False
 isVal _ Ascribe{} = False
+isVal _ FixOp{} = True
 isVal _ Fix{} = False
 isVal _ TupleProj{} = False
 isVal _ TIf{} = False
@@ -57,14 +59,18 @@ eval1 ctx = go
       TermBind t _ -> Just t
       _ -> Nothing
     go Abs{} = Nothing
-    go (App _fi (Abs __fi _x _tyT11 t12) v2)
+    go (App _ (Abs _ _ _ t12) v2)
       | isVal ctx v2 = Just $ termSubstTop v2 t12
+    go t@(App _ FixOp{} (Abs _ _ _ body))
+      = Just $ termSubstTop t body
+    go (App fi f@FixOp{} t) = eval1 ctx t >>= Just . App fi f
     go (App fi v1 t2)
       | isVal ctx v1 = eval1 ctx t2 >>= Just . App fi v1
     go (App fi t1 t2) = eval1 ctx t1 >>= \t1' -> Just $ App fi t1' t2
     go TAbs{} = Nothing
-    go (TApp _fi (TAbs __fi _x t11) tyT2) =
+    go (TApp _ (TAbs _ _ t11) tyT2) =
       Just $ tytermSubstTop tyT2 t11
+    go (TApp _ FixOp{} ty) = Just . FixOp $ Just ty
     go (TApp fi t1 tyT2) = eval1 ctx t1 >>= \t1' -> Just $ TApp fi t1' tyT2
     go (TUnpack _fi _ _ (TPack _ tyT11 v12 _) t2)
       | isVal ctx v12 = Just
@@ -76,6 +82,7 @@ eval1 ctx = go
     go (Ascribe _ t _)
       | isVal ctx t = Just t
     go (Ascribe fi t ty) = eval1 ctx t >>= Just . flip (Ascribe fi) ty
+    go FixOp{} = Nothing
     go t@(Fix _ (Abs _ _ _ body)) =
       Just $ termSubstTop t body
     go (Fix fi t) = eval1 ctx t >>= Just . Fix fi
@@ -145,7 +152,7 @@ typeOf ctx = go
           then tyT12
           else err fi "app: parameter type mismatch"
         _ -> err fi "app: arrow type expected"
-    go (TAbs _fi tyX t2) =
+    go (TAbs _ tyX t2) =
       let ctx' = addBinding ctx tyX TyVarBind
           tyT2 = typeOf ctx' t2
       in TyAll tyX tyT2
@@ -178,6 +185,7 @@ typeOf ctx = go
                         , "for term " ++ showTerm ctx t
                         , "found type", showType ctx tyT, "instead"
                         ]
+    go (FixOp mTy) = fixType ctx mTy
     go (Fix fi t) =
       case simpleTypeOf t of
         (TyArr ty ty') ->

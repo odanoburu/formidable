@@ -13,7 +13,7 @@ import F.Syntax ( Binding(..), Command(..), Context(..), Term(..), Type(..)
                 , prettyBinding, showTermType, termShift)
 import F.Parser (parseCommands, parseTerm)
 import F.Decor (decor)
-import F.Eval (InContext(..), eval, evalBinding, simplifyType, typeOf)
+import F.Eval (InContext(..), eval, evalBinding, fixType, simplifyType, typeOf)
 
 
 import Data.Bifunctor (bimap)
@@ -78,5 +78,6 @@ parseDecorateTerm ctx input = bimap id (`decor` ctx)
 
 initialContext :: Context
 initialContext =
-  makeContext [ ("nil", TermBind (Nil dummyInfo) $ Just (nilType mempty))
+  makeContext [ ("fix", TermBind (FixOp Nothing) . Just $ fixType mempty Nothing)
+              , ("nil", TermBind (Nil dummyInfo) . Just $ nilType mempty)
               ]
