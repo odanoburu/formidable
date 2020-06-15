@@ -2,7 +2,7 @@
 module F.Parser (Parser, parseCommands, parseTerm, pix, term, typeP) where
 
 
-import F.Syntax ( Binding(..), Command(..), Info(..), Term(..), Type(..))
+import F.Syntax ( Binding(..), Command(..), Info(..), Term(..), Type(..), pix)
 
 
 import Control.Monad (void)
@@ -74,8 +74,9 @@ typeAtom = parens typeP
   <|> someTy
   <|> (TyBool <$ pKeyword "Bool" <?> "Bool type")
   <|> (TyNat <$ pKeyword "Nat" <?> "Nat type")
-  <|> (TyVar pix pix <$> tyIdentifier <?> "type variable")
+  <|> try (TyVar pix pix <$> tyIdentifier <?> "type variable")
   <|> (TyTuple <$> tupleOf typeP)
+  <|> TyList <$> (pKeyword "List" *> typeP)
   where
     allTy = TyAll
       <$> ((pKeyword "Forall" <|> symbol_ "∀") *> tyIdentifier <* period)
@@ -161,7 +162,6 @@ term = makeExprParser termAtom table
                 -- application…
                 InfixL (App <$> info <* symbol "" <* notFollowedBy "!")
               , InfixL (TupleProj <$> info <* symbol "!")
-              , InfixR (Cons <$> info <* (symbol "∷" <|> symbol "::"))
               , Postfix ((\i tyT t -> TApp i t tyT) <$> info <*> brackets typeP)
               , Postfix ((\i ty t -> Ascribe i t ty)
                          <$> info <*> (symbol "as" *> typeP))
@@ -180,7 +180,7 @@ keywords
   = S.fromList [
   "Forall", "Exists", "λ", "lambda", "Λ", "Lambda", "in",
   "let", "as", "if", "then", "else", "succ", "pred", "isZero",
-  "Nat", "Bool"
+  "Nat", "Bool", "List", "nil", "cons"
   ]
 
 termIdentifier :: Parser String
@@ -247,6 +247,3 @@ rcurly = symbol_ "}"
 info :: Parser Info
 info = Offset <$> getOffset
 
-pix :: Int
--- placeholder index
-pix = -1

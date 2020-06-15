@@ -7,8 +7,10 @@ module F.Syntax (
   dummyInfo,
   err,
   makeContext,
+  consType,
   fixType,
   nilType,
+  pix,
   termSubstTop,
   tytermSubstTop,
   typeSubstTop,
@@ -80,8 +82,8 @@ data Term
   | Ascribe Info Term Type
   | Tuple Info [Term]
   | TupleProj Info Term Term
-  | Nil Info
-  | Cons Info Term Term
+  | Nil (Maybe Type)
+  | ConsOp (Maybe Type)
   | TTrue Info
   | TFalse Info
   | TIf Info Term Term Term
@@ -185,12 +187,12 @@ tmmap onVar onType = go
     go c (TUnpack fi tyX x t1 t2) =
       TUnpack fi tyX x (go c t1) (go (c+2) t2)
     go c (Ascribe fi t ty) = Ascribe fi (go c t) (onType c ty)
-    go _ f@FixOp{} = f
+    go c (FixOp mty) = FixOp $ fmap (onType c) mty
     go c (Fix fi t) = Fix fi $ go c t
     go c (Tuple fi ts) = Tuple fi $ fmap (go c) ts
     go c (TupleProj fi tu ti) = TupleProj fi (go c tu) (go c ti)
-    go _ n@Nil{} = n
-    go c (Cons fi th tt) = Cons fi (go c th) (go c tt)
+    go c (Nil mty) = Nil $ fmap (onType c) mty
+    go c (ConsOp mty) = ConsOp (fmap (onType c) mty)
     go _ t@TTrue{} = t
     go _ f@TFalse{} = f
     go c (TIf fi tcond tt tf) = TIf fi (go c tcond) (go c tt) (go c tf)
@@ -320,7 +322,14 @@ freshName c@(Ctx ctx (Sum n)) x =
 
 nilType :: Context -> Type
 nilType ctx = let tyX = snd $ freshName ctx "X"
-  in TyAll tyX (TyVar 0 1 tyX)
+  in TyAll tyX (TyList $ TyVar 0 1 tyX)
+
+consType :: Context -> Type
+consType ctx =
+  TyAll tyX (TyArr x (TyArr (TyList x) (TyList x)))
+  where
+    tyX = snd $ freshName ctx "X"
+    x = TyVar 0 1 tyX
 
 
 fixType :: Context -> Maybe Type -> Type
@@ -348,6 +357,7 @@ prettyType ctx' tyT = arrowType ctx' tyT
     atomicType _ (TyVar _ _ x) = pretty x
     atomicType _ (TyId b) = pretty b
     atomicType ctx (TyTuple tys) = prettyTuple $ fmap (prettyType ctx) tys
+    atomicType ctx (TyList ty) = "List" <+> prettyType ctx ty
     atomicType _ TyBool = "Bool"
     atomicType _ TyNat = "Nat"
     atomicType ctx (TySome tyX ty) =
@@ -408,8 +418,10 @@ prettyTerm appCtx appT = appTerm appCtx appT
     pathTerm ctx (TupleProj _ tu ti) =
       atomicTerm ctx tu <+> "!" <+> atomicTerm ctx ti
     pathTerm ctx t = atomicTerm ctx t
-    atomicTerm _ (Var _ _ _ vn) = pretty vn
+    atomicTerm _ (Var _ vn _ _) = pretty vn
     atomicTerm ctx (Tuple _ ts) = prettyTuple $ fmap (prettyTerm ctx) ts
+    atomicTerm _ Nil{} = "nil"
+    atomicTerm _ (ConsOp _) = "cons"
     atomicTerm _ TTrue{} = "#t"
     atomicTerm _ TFalse{} = "#f"
     atomicTerm _ TZero{} = "0"
@@ -449,3 +461,7 @@ prettyBinding ctx = go
     go (TermBind _ Nothing) = mempty
     go (TermBind _ (Just ty)) = ":" <+> prettyType ctx ty
 
+
+pix :: Int
+-- placeholder index
+pix = -1

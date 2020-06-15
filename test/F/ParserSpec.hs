@@ -54,8 +54,8 @@ termSpec = describe "term" $ do
     TApp d (Abs d "y" TyBool (Var d "y" pix pix)) (TyVar pix pix "X")
 
   specify "packing" $
-    "{*List, nil} as Stack" `termParsesAs`
-    TPack d (TyVar pix pix "List") (Var d "nil" pix pix) (TyVar pix pix "Stack")
+    "{*MyList, myNil} as Stack" `termParsesAs`
+    TPack d (TyVar pix pix "MyList") (Var d "myNil" pix pix) (TyVar pix pix "Stack")
 
   specify "unpacking" $
     "let {Stack, st} = f stackADT in st" `termParsesAs`

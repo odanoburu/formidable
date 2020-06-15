@@ -9,7 +9,7 @@ module F.Lib
 
 
 import F.Syntax ( Binding(..), Command(..), Context(..), Term(..), Type(..)
-                , addBinding, dummyInfo, makeContext, nilType, showError
+                , addBinding, consType, makeContext, nilType, showError
                 , prettyBinding, showTermType, termShift)
 import F.Parser (parseCommands, parseTerm)
 import F.Decor (decor)
@@ -78,6 +78,9 @@ parseDecorateTerm ctx input = bimap id (`decor` ctx)
 
 initialContext :: Context
 initialContext =
-  makeContext [ ("fix", TermBind (FixOp Nothing) . Just $ fixType mempty Nothing)
-              , ("nil", TermBind (Nil dummyInfo) . Just $ nilType mempty)
+  makeContext [ define "fix" (FixOp Nothing) (fixType mempty Nothing)
+              , define "nil" (Nil Nothing) (nilType mempty)
+              , define "cons" (ConsOp Nothing) (consType mempty)
               ]
+  where
+    define name t ty = (name, TermBind t $ Just ty)

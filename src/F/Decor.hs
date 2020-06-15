@@ -45,7 +45,9 @@ decor (Ascribe fi t ty) ctx =
   let t' = decor t ctx
       ty' = decorT ty ctx
   in Ascribe fi t' ty'
-decor f@FixOp{} _ = f
+decor (FixOp mty) ctx =
+  let mty' = fmap (`decorT` ctx) mty
+  in FixOp mty'
 decor (Fix fi t) ctx =
   let t' = decor t ctx
   in Fix fi t'
@@ -57,10 +59,9 @@ decor (TupleProj fi tu ti) ctx =
       ti' = decor ti ctx
   in TupleProj fi tu' ti'
 decor n@Nil{} _ = n
-decor (Cons fi th tt) ctx =
-  let th' = decor th ctx
-      tt' = decor tt ctx
-  in Cons fi th' tt'
+decor (ConsOp mty) ctx =
+  let mty' = fmap (`decorT` ctx) mty
+  in ConsOp mty'
 decor t@TTrue{} _ = t
 decor f@TFalse{} _ = f
 decor (TIf fi tcond tt tf) ctx =

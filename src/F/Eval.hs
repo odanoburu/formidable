@@ -12,7 +12,7 @@ module F.Eval
 
 
 import F.Syntax (Type(..), Term(..), Binding(..), Context(..),
-                 addBinding, addName, dummyInfo, err,
+                 addBinding, addName, consType, dummyInfo, err,
                  getBinding, getTypeFromContext,
                  fixType, nilType,
                  showTerm, showType,
@@ -34,7 +34,7 @@ isVal _ TAbs{}   = True
 isVal ctx (TPack _ _ v _) = isVal ctx v
 isVal ctx (Tuple _ ts) = all (isVal ctx) ts
 isVal _ Nil{} = True
-isVal ctx (Cons _ th tt) = isVal ctx th && isVal ctx tt
+isVal _ ConsOp{} = True
 isVal _ TTrue{}  = True
 isVal _ TFalse{} = True
 isVal _ TZero{}  = True
@@ -110,9 +110,7 @@ eval1 ctx = go
     go (TupleProj fi tu ti) =
       eval1 ctx tu >>= \tu' -> Just $ TupleProj fi tu' ti
     go Nil{} = Nothing
-    go (Cons fi th tt)
-      | isVal ctx th = eval1 ctx tt >>= Just . Cons fi th
-    go (Cons _ th _) = eval1 ctx th
+    go ConsOp{} = Nothing
     go TTrue{} = Nothing
     go TFalse{} = Nothing
     go (TIf _ TTrue{} tt _) = Just tt
@@ -201,17 +199,10 @@ typeOf ctx = go
           then fromMaybe (err fi "!: out of bounds") (tys !! ti)
           else err fi "!: Nat type expected as right argument"
         _ -> err fi "!: tuple type expected as left argument"
-    go Nil{} = nilType ctx
-    go (Cons fi th tt) =
-      case simpleTypeOf tt of
-        TyList ty ->
-          case th `typeIs` ty of
-            (True, thTy) -> TyList thTy
-            (False, thTy)
-              -> err fi $ unlines ["∷: expected type " ++ showType ctx ty
-                                   ++ " for head argument"
-                                  , "found type " ++ showType ctx thTy ++ " instead"]
-        _ -> err fi "∷: list type expected as tail argument"
+    go (Nil Nothing) = nilType ctx
+    go (Nil (Just ty)) = TyList ty
+    go (ConsOp Nothing) = consType ctx
+    go (ConsOp (Just ty)) = TyArr ty (TyArr (TyList ty) (TyList ty))
     go (TTrue _)  = TyBool
     go (TFalse _) = TyBool
     go (TIf fi tcond tt tf) =
