@@ -50,7 +50,7 @@ termSpec = describe "term" $ do
     TAbs d "X" (Var d "y" pix pix)
 
   specify "type application" $
-    "(lambda y:Bool. y) [X]" `termParsesAs`
+    "(lambda y:Bool. y) @X" `termParsesAs`
     TApp d (Abs d "y" TyBool (Var d "y" pix pix)) (TyVar pix pix "X")
 
   specify "packing" $

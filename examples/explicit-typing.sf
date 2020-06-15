@@ -4,9 +4,9 @@
 
 fst = (ΛX.ΛY. λxy:<X,Y>. xy ! 0) as ∀X.∀Y. <X,Y> -> X ;
 
-fstNat = (fst [Nat]) as ∀Y. <Nat,Y> -> Nat ;
+fstNat = (fst @Nat) as ∀Y. <Nat,Y> -> Nat ;
 
-fstNatBool = (fstNat [Bool]) as <Nat, Bool> -> Nat ;
+fstNatBool = (fstNat @Bool) as <Nat, Bool> -> Nat ;
 
 bimap = (ΛX.ΛY.ΛW.ΛZ. λf:X->W.λg:Y->Z. λxy:<X,Y>. <f (xy ! 0), g (xy ! 1)>)
       as ∀X.∀Y.∀W.∀Z. (X -> W) -> (Y -> Z) -> <X, Y> -> <W, Z> ;

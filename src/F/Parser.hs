@@ -14,7 +14,7 @@ import qualified Data.Set as S
 import Numeric.Natural (Natural)
 import Prelude hiding (abs, pred, succ)
 import Text.Megaparsec hiding (State)
-import Text.Megaparsec.Char ( alphaNumChar, space1
+import Text.Megaparsec.Char ( alphaNumChar, char, space1
                             , string )
 --import Text.Megaparsec.Debug (dbg)
 import qualified Text.Megaparsec.Char.Lexer as L
@@ -162,7 +162,7 @@ term = makeExprParser termAtom table
                 -- application…
                 InfixL (App <$> info <* symbol "" <* notFollowedBy "!")
               , InfixL (TupleProj <$> info <* symbol "!")
-              , Postfix ((\i tyT t -> TApp i t tyT) <$> info <*> brackets typeP)
+              , Postfix ((\i tyT t -> TApp i t tyT) <$> info <*> atsign typeP)
               , Postfix ((\i ty t -> Ascribe i t ty)
                          <$> info <*> (symbol "as" *> typeP))
               ]
@@ -228,9 +228,9 @@ pKeyword keyword = void $ lexeme (string keyword <* notFollowedBy alphaNumChar)
 pair :: (String, String) -> Parser b -> Parser b
 pair (beg, end) = between (symbol beg) (symbol end)
 
-parens, brackets :: Parser a -> Parser a
+atsign, parens :: Parser a -> Parser a
 parens = pair ("(", ")")
-brackets = pair ("[", "]")
+atsign p = char '@' *> p
 
 symbol_ :: String -> Parser ()
 symbol_ = void . symbol
