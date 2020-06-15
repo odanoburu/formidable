@@ -1,0 +1,21 @@
+nil ;
+
+emptyBoolList = nil [Bool] ;
+
+cons ;
+
+boolCons = cons [Bool] ;
+
+boolList = boolCons #f (boolCons #t emptyBoolList) ;
+
+boolList ;
+
+isNil [Bool] emptyBoolList ;
+
+isNil [Bool] boolList ;
+
+head [Bool] boolList ;
+
+head [Bool] (tail [Bool] boolList) ;
+
+

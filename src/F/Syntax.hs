@@ -6,9 +6,13 @@ module F.Syntax (
   addName,
   dummyInfo,
   err,
+  isNilType,
   makeContext,
+  consTerm,
   consType,
   fixType,
+  freshName,
+  headType,
   nilType,
   pix,
   termSubstTop,
@@ -25,6 +29,7 @@ module F.Syntax (
   showTerm,
   showTermType,
   showType,
+  tailType,
   ) where
 
 
@@ -82,8 +87,11 @@ data Term
   | Ascribe Info Term Type
   | Tuple Info [Term]
   | TupleProj Info Term Term
-  | Nil (Maybe Type)
-  | ConsOp (Maybe Type)
+  | Cons Info Term Term
+  | Nil
+  | IsNilOp (Maybe Type)
+  | HeadOp (Maybe Type)
+  | TailOp (Maybe Type)
   | TTrue Info
   | TFalse Info
   | TIf Info Term Term Term
@@ -188,11 +196,14 @@ tmmap onVar onType = go
       TUnpack fi tyX x (go c t1) (go (c+2) t2)
     go c (Ascribe fi t ty) = Ascribe fi (go c t) (onType c ty)
     go c (FixOp mty) = FixOp $ fmap (onType c) mty
+    go c (Cons fi th tt) = Cons fi (go c th) (go c tt)
+    go c (IsNilOp mty) = IsNilOp $ fmap (onType c) mty
+    go c (HeadOp mty) = HeadOp $ fmap (onType c) mty
+    go c (TailOp mty) = TailOp $ fmap (onType c) mty
     go c (Fix fi t) = Fix fi $ go c t
     go c (Tuple fi ts) = Tuple fi $ fmap (go c) ts
     go c (TupleProj fi tu ti) = TupleProj fi (go c tu) (go c ti)
-    go c (Nil mty) = Nil $ fmap (onType c) mty
-    go c (ConsOp mty) = ConsOp (fmap (onType c) mty)
+    go _ Nil = Nil
     go _ t@TTrue{} = t
     go _ f@TFalse{} = f
     go c (TIf fi tcond tt tf) = TIf fi (go c tcond) (go c tt) (go c tf)
@@ -320,26 +331,44 @@ freshName c@(Ctx ctx (Sum n)) x =
     isBound = x `elem` fmap fst ctx
 
 
-nilType :: Context -> Type
-nilType ctx = let tyX = snd $ freshName ctx "X"
-  in TyAll tyX (TyList $ TyVar 0 1 tyX)
-
-consType :: Context -> Type
-consType ctx =
-  TyAll tyX (TyArr x (TyArr (TyList x) (TyList x)))
+consTerm :: Context -> Term
+consTerm ctx
+  = TAbs d tyX
+    (Abs d "x" (TyVar 0 1 tyX)
+      (Abs d "xs" (TyList (TyVar 1 2 tyX))
+        (Cons d (Var d "x" 2 3) (Var d "xs" 0 3))))
   where
+    d = dummyInfo
     tyX = snd $ freshName ctx "X"
-    x = TyVar 0 1 tyX
 
+
+universalType :: (Type -> Type) -> Context -> Maybe Type -> Type
+universalType f ctx mty =
+  case mty of
+    Just ty -> f ty
+    Nothing -> TyAll tyX $ f x
+      where
+        tyX = snd $ freshName ctx "X"
+        x = TyVar 0 1 tyX
+
+
+nilType :: Context -> Maybe Type -> Type
+nilType = universalType TyList
+
+consType :: Context -> Maybe Type -> Type
+consType = universalType (\ty -> TyArr ty (TyArr (TyList ty) (TyList ty)))
+
+isNilType :: Context -> Maybe Type -> Type
+isNilType = universalType (\ty -> TyArr (TyList ty) TyBool)
+
+headType :: Context -> Maybe Type -> Type
+headType = universalType (\ty -> TyArr (TyList ty) ty)
+
+tailType :: Context -> Maybe Type -> Type
+tailType = universalType (\ty -> TyArr (TyList ty) (TyList ty))
 
 fixType :: Context -> Maybe Type -> Type
-fixType ctx mTy =
-  case mTy of
-    Nothing -> TyAll tyX $ go (TyVar 0 1 tyX)
-    Just ty -> go ty
-  where
-    tyX = snd $ freshName ctx "X"
-    go ty = TyArr (TyArr ty ty) ty
+fixType = universalType (\ty -> TyArr (TyArr ty ty) ty)
 
 
 prettyType :: Context -> Type -> Doc a
@@ -420,8 +449,13 @@ prettyTerm appCtx appT = appTerm appCtx appT
     pathTerm ctx t = atomicTerm ctx t
     atomicTerm _ (Var _ vn _ _) = pretty vn
     atomicTerm ctx (Tuple _ ts) = prettyTuple $ fmap (prettyTerm ctx) ts
+    atomicTerm ctx (Cons _ th tt)
+      = "(cons" <+> atomicTerm ctx th
+      <+> atomicTerm ctx tt <> ")"
     atomicTerm _ Nil{} = "nil"
-    atomicTerm _ (ConsOp _) = "cons"
+    atomicTerm _ IsNilOp{} = "isNil"
+    atomicTerm _ HeadOp{} = "head"
+    atomicTerm _ TailOp{} = "tail"
     atomicTerm _ TTrue{} = "#t"
     atomicTerm _ TFalse{} = "#f"
     atomicTerm _ TZero{} = "0"

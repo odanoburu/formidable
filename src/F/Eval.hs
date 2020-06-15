@@ -12,12 +12,12 @@ module F.Eval
 
 
 import F.Syntax (Type(..), Term(..), Binding(..), Context(..),
-                 addBinding, addName, consType, dummyInfo, err,
-                 getBinding, getTypeFromContext,
+                 addBinding, addName, dummyInfo, err,
+                 getBinding, getTypeFromContext, headType, isNilType,
                  fixType, nilType,
-                 showTerm, showType,
+                 showTerm, showType, tailType,
                  termShift, termSubstTop, tytermSubstTop,
-                 typeShift, typeSubstTop
+                 typeShift, typeSubstTop,
                  )
 import F.Decor (decor , decorT)
 
@@ -33,8 +33,11 @@ isVal _ Abs{}    = True
 isVal _ TAbs{}   = True
 isVal ctx (TPack _ _ v _) = isVal ctx v
 isVal ctx (Tuple _ ts) = all (isVal ctx) ts
+isVal ctx (Cons _ th tt) = isVal ctx th && isVal ctx tt
 isVal _ Nil{} = True
-isVal _ ConsOp{} = True
+isVal _ IsNilOp{} = True
+isVal _ HeadOp{} = True
+isVal _ TailOp{} = True
 isVal _ TTrue{}  = True
 isVal _ TFalse{} = True
 isVal _ TZero{}  = True
@@ -64,6 +67,18 @@ eval1 ctx = go
     go t@(App _ FixOp{} (Abs _ _ _ body))
       = Just $ termSubstTop t body
     go (App fi f@FixOp{} t) = eval1 ctx t >>= Just . App fi f
+    go (App fi IsNilOp{} Nil{})
+      = Just $ TTrue fi
+    go (App fi IsNilOp{} Cons{})
+      = Just $ TFalse fi
+    go (App fi HeadOp{} Nil{})
+      = err fi "head: empty list"
+    go (App _ HeadOp{} (Cons _ t _))
+      = Just t
+    go (App _ TailOp{} n@Nil{})
+      = Just n
+    go (App _ TailOp{} (Cons _ _ t))
+      = Just t
     go (App fi v1 t2)
       | isVal ctx v1 = eval1 ctx t2 >>= Just . App fi v1
     go (App fi t1 t2) = eval1 ctx t1 >>= \t1' -> Just $ App fi t1' t2
@@ -71,6 +86,10 @@ eval1 ctx = go
     go (TApp _ (TAbs _ _ t11) tyT2) =
       Just $ tytermSubstTop tyT2 t11
     go (TApp _ FixOp{} ty) = Just . FixOp $ Just ty
+    go (TApp _ Nil{} _) = Just Nil
+    go (TApp _ IsNilOp{} ty) = Just . IsNilOp $ Just ty
+    go (TApp _ HeadOp{} ty) = Just . HeadOp $ Just ty
+    go (TApp _ TailOp{} ty) = Just . TailOp $ Just ty
     go (TApp fi t1 tyT2) = eval1 ctx t1 >>= \t1' -> Just $ TApp fi t1' tyT2
     go (TUnpack _fi _ _ (TPack _ tyT11 v12 _) t2)
       | isVal ctx v12 = Just
@@ -86,15 +105,7 @@ eval1 ctx = go
     go t@(Fix _ (Abs _ _ _ body)) =
       Just $ termSubstTop t body
     go (Fix fi t) = eval1 ctx t >>= Just . Fix fi
-    go (Tuple _ []) = Nothing
-    go (Tuple fi ts) = case foldr f (False, []) ts of
-      (True, ts') -> Just $ Tuple fi ts'
-      (False, _) -> Nothing
-      where
-        f t (True, ts') = (True, t:ts')
-        f t (False, ts') = case eval1 ctx t of
-          Just t' -> (True, t':ts')
-          Nothing -> (False, t:ts')
+    go (Tuple fi ts) = evalList (Tuple fi) ts
     go (TupleProj _ (Tuple _ []) _) = Nothing -- DOUBT: will typeOf get this error?
     go (TupleProj _ (Tuple _ (t:_)) TZero{})
       | isVal ctx t = Just t
@@ -109,8 +120,14 @@ eval1 ctx = go
       eval1 ctx ti >>= Just . TupleProj fi tu
     go (TupleProj fi tu ti) =
       eval1 ctx tu >>= \tu' -> Just $ TupleProj fi tu' ti
+    go (Cons fi th tt)
+      | isVal ctx th = eval1 ctx tt >>= Just . Cons fi th
+    go (Cons fi th tt)
+      = eval1 ctx th >>= Just . flip (Cons fi) tt
     go Nil{} = Nothing
-    go ConsOp{} = Nothing
+    go IsNilOp{} = Nothing
+    go HeadOp{} = Nothing
+    go TailOp{} = Nothing
     go TTrue{} = Nothing
     go TFalse{} = Nothing
     go (TIf _ TTrue{} tt _) = Just tt
@@ -125,6 +142,14 @@ eval1 ctx = go
     go (TIsZero fi TZero{}) = Just $ TTrue fi
     go (TIsZero fi TSucc{}) = Just $ TFalse fi
     go (TIsZero fi t) = eval1 ctx t >>= Just . TIsZero fi
+    evalList g ts = case foldr f (False, []) ts of
+      (True, ts') -> Just $ g ts'
+      (False, _) -> Nothing
+      where
+        f t (True, ts') = (True, t:ts')
+        f t (False, ts') = case eval1 ctx t of
+          Just t' -> (True, t':ts')
+          Nothing -> (False, t:ts')
 
 
 eval :: Context -> Term -> Term
@@ -175,14 +200,9 @@ typeOf ctx = go
           in typeShift (-2) tyT2
         _ -> err fi "unpack: existential type expected"
     go (Ascribe fi t ty) =
-      let tyT = simpleTypeOf t
-      in if typeEqv ctx tyT ty
-         then ty
-         else err fi
-              $ unlines [ "as-type: expected type " ++ showType ctx ty
-                        , "for term " ++ showTerm ctx t
-                        , "found type", showType ctx tyT, "instead"
-                        ]
+      case t `typeIs` ty of
+        (True, ty') -> ty'
+        (False, ty') -> unexpected fi "as-type" ty t ty'
     go (FixOp mTy) = fixType ctx mTy
     go (Fix fi t) =
       case simpleTypeOf t of
@@ -195,14 +215,22 @@ typeOf ctx = go
     go (TupleProj fi tu ti) =
       case simpleTypeOf tu of
         (TyTuple tys) ->
-          if fst $ ti `typeIs` TyNat
-          then fromMaybe (err fi "!: out of bounds") (tys !! ti)
-          else err fi "!: Nat type expected as right argument"
+          case ti `typeIs` TyNat of
+            (True, _) -> fromMaybe (err fi "!: out of bounds") (tys !! ti)
+            (False, ty)
+              -> unexpected fi "!" TyNat ti ty
         _ -> err fi "!: tuple type expected as left argument"
-    go (Nil Nothing) = nilType ctx
-    go (Nil (Just ty)) = TyList ty
-    go (ConsOp Nothing) = consType ctx
-    go (ConsOp (Just ty)) = TyArr ty (TyArr (TyList ty) (TyList ty))
+    go (Cons fi th tt) =
+      case simpleTypeOf tt of
+        TyList ty ->
+          case th `typeIs` ty of
+            (True, ty') -> ty'
+            (False, ty') -> unexpected fi "cons" ty th ty'
+        ty -> unexpected fi "cons" (TyList $ simpleTypeOf th) tt ty
+    go Nil = nilType ctx Nothing
+    go (IsNilOp mty) = isNilType ctx mty
+    go (HeadOp mty) = headType ctx mty
+    go (TailOp mty) = tailType ctx mty
     go (TTrue _)  = TyBool
     go (TFalse _) = TyBool
     go (TIf fi tcond tt tf) =
@@ -228,6 +256,12 @@ typeOf ctx = go
     typeIs t ty = let ty' = typeOf ctx t
       in (typeEqv ctx ty ty', ty')
     simpleTypeOf = simplifyType ctx . typeOf ctx
+    unexpected fi fname expected term found
+      = err fi
+        $ unlines [ fname ++ ": expected type " ++ showType ctx expected
+                  , "for term " ++ showTerm ctx term
+                  , "found type", showType ctx found, "instead"
+                  ]
 
 
 typeEqv :: Context -> Type -> Type -> Bool

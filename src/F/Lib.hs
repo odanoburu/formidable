@@ -9,8 +9,9 @@ module F.Lib
 
 
 import F.Syntax ( Binding(..), Command(..), Context(..), Term(..), Type(..)
-                , addBinding, consType, makeContext, nilType, showError
-                , prettyBinding, showTermType, termShift)
+                , addBinding, consTerm, consType, headType, isNilType
+                , makeContext, nilType, showError
+                , prettyBinding, showTermType, tailType, termShift)
 import F.Parser (parseCommands, parseTerm)
 import F.Decor (decor)
 import F.Eval (InContext(..), eval, evalBinding, fixType, simplifyType, typeOf)
@@ -78,9 +79,12 @@ parseDecorateTerm ctx input = bimap id (`decor` ctx)
 
 initialContext :: Context
 initialContext =
-  makeContext [ define "fix" (FixOp Nothing) (fixType mempty Nothing)
-              , define "nil" (Nil Nothing) (nilType mempty)
-              , define "cons" (ConsOp Nothing) (consType mempty)
+  makeContext [ define "fix" FixOp fixType
+              , define "nil" (const Nil) nilType
+              , define "cons" (const (consTerm mempty)) consType
+              , define "isNil" IsNilOp isNilType
+              , define "head" HeadOp headType
+              , define "tail" TailOp tailType
               ]
   where
-    define name t ty = (name, TermBind t $ Just ty)
+    define name t fTy = (name, TermBind (t Nothing) . Just $ fTy mempty Nothing)

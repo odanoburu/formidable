@@ -180,7 +180,7 @@ keywords
   = S.fromList [
   "Forall", "Exists", "λ", "lambda", "Λ", "Lambda", "in",
   "let", "as", "if", "then", "else", "succ", "pred", "isZero",
-  "Nat", "Bool", "List", "nil", "cons"
+  "Nat", "Bool", "List"
   ]
 
 termIdentifier :: Parser String
