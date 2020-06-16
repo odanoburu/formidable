@@ -79,7 +79,7 @@ parseDecorateTerm ctx input = bimap id (`decor` ctx)
 
 initialContext :: Context
 initialContext =
-  makeContext [ define "fix" FixOp fixType
+  makeContext [ define "fix" FixOp (`fixType` Nothing)
               , define "nil" (const Nil) nilType
               , define "cons" (const (consTerm mempty)) consType
               , define "isNil" IsNilOp isNilType

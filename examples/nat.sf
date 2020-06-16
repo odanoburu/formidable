@@ -15,7 +15,7 @@ nn = λh:Nat -> Nat -> Nat.
               then n
               else h (pred m) (succ n) ;
 
-add = fix @(Nat -> Nat -> Nat) nn ;
+add = fix @Nat @(Nat -> Nat) nn ;
 
 add 0 0 ;
 add 2 0 ;
@@ -29,7 +29,7 @@ mulf = λh:Nat -> Nat -> Nat.
               then 0
               else add n (h (pred m) n) ;
 
-mul = fix @(Nat -> Nat -> Nat) mulf ;
+mul = fix @Nat @(Nat -> Nat) mulf ;
 
 mul 0 2 ;
 mul 2 0 ;

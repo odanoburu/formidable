@@ -1,0 +1,14 @@
+fix ;
+
+fixNat = fix @Nat @(Nat -> Nat) ;
+
+// nm : (nat -> nat -> nat) -> nat -> nat -> nat
+nn = λh:Nat -> Nat -> Nat.
+      λm:Nat. λn:Nat. if isZero m
+              then n
+              else h (pred m) (succ n) ;
+
+// plus : Nat -> Nat -> Nat
+plus = fixNat nn ;
+
+plus 3 4 ;

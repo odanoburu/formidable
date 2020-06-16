@@ -7,17 +7,19 @@ import F.Syntax ( Binding(..), Command(..), Info(..), Term(..), Type(..), pix)
 
 import Control.Monad (void)
 import Control.Monad.Combinators.Expr (makeExprParser, Operator(..))
+import Control.Monad.Combinators.NonEmpty (some)
 import Data.Bifunctor (bimap)
 import Data.Char (isAlphaNum, isAsciiLower, isAsciiUpper)
 import Data.Set (Set)
 import qualified Data.Set as S
 import Numeric.Natural (Natural)
 import Prelude hiding (abs, pred, succ)
-import Text.Megaparsec hiding (State)
+import Text.Megaparsec hiding (State, some)
 import Text.Megaparsec.Char ( alphaNumChar, char, space1
                             , string )
 --import Text.Megaparsec.Debug (dbg)
 import qualified Text.Megaparsec.Char.Lexer as L
+import Data.List.NonEmpty (NonEmpty(..))
 
 
 ---
@@ -162,11 +164,17 @@ term = makeExprParser termAtom table
                 -- application…
                 InfixL (App <$> info <* symbol "" <* notFollowedBy "!")
               , InfixL (TupleProj <$> info <* symbol "!")
-              , Postfix ((\i tyT t -> TApp i t tyT) <$> info <*> atsign typeP)
+              , Postfix severalAt -- ((\i tyT t -> TApp i t tyT) <$> info <*> atsign typeP)
               , Postfix ((\i ty t -> Ascribe i t ty)
                          <$> info <*> (symbol "as" *> typeP))
               ]
             ]
+    severalAt = do
+      args <- some ((,) <$> info <*> atsign typeP)
+      return $ case args of
+        (i, ty):|args' -> foldr go (\t -> TApp i t ty) args'
+          where
+            go (i', ty') f = \t -> TApp i' (f t) ty'
 
 
 tupleOf :: Parser a -> Parser [a]
@@ -246,4 +254,3 @@ rcurly = symbol_ "}"
 
 info :: Parser Info
 info = Offset <$> getOffset
-

@@ -203,7 +203,7 @@ typeOf ctx = go
       case t `typeIs` ty of
         (True, ty') -> ty'
         (False, ty') -> unexpected fi "as-type" ty t ty'
-    go (FixOp mTy) = fixType ctx mTy
+    go (FixOp mTy) = fixType ctx mTy Nothing
     go (Fix fi t) =
       case simpleTypeOf t of
         (TyArr ty ty') ->

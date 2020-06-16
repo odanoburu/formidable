@@ -367,8 +367,23 @@ headType = universalType (\ty -> TyArr (TyList ty) ty)
 tailType :: Context -> Maybe Type -> Type
 tailType = universalType (\ty -> TyArr (TyList ty) (TyList ty))
 
-fixType :: Context -> Maybe Type -> Type
-fixType = universalType (\ty -> TyArr (TyArr ty ty) ty)
+fixType :: Context -> Maybe Type -> Maybe Type -> Type
+fixType ctx mTyX mTyY =
+  case (mTyX, mTyY) of
+    (Just tyX, Just tyY) -> fixType' tyX tyY
+    (Just tyX, Nothing) -> universalType (fixType' tyX) ctx Nothing
+    (Nothing, Nothing) -> TyAll x . TyAll y $ fixType' tyX tyY
+      where
+        x = snd $ freshName ctx "X"
+        tyX = TyVar 1 2 x
+        y = snd $ freshName ctx "Y"
+        tyY = TyVar 0 2 y
+    _ -> error "Internal error: fix operator type"
+  where
+    fixType' tyX tyY = TyArr (TyArr (TyArr tyX tyY)
+                                (TyArr tyX tyY))
+                         (TyArr tyX tyY)
+                                                         
 
 
 prettyType :: Context -> Type -> Doc a
