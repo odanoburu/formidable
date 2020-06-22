@@ -90,22 +90,34 @@ runREPL _ = runInputT defaultSettings (loop initialContext)
               Right (os `InCtx` ctx') -> do
                 mapM_ (outputStrLn.fst) os
                 loop ctx'
-              Left err -> outputStrLn err *> loop ctx
+              Left err -> printContinue err
             return ()
         Nothing -> return () -- control-D and stuff
         where
+          printContinue err = outputStrLn err *> loop ctx
           handleMetaCommand "e" _ = return ()
           handleMetaCommand "exit" _ = return ()
           handleMetaCommand "q" _ = return ()
           handleMetaCommand "quit" _ = return ()
           handleMetaCommand "c" t = handleMetaCommand "context" t
-          handleMetaCommand "context" _ = outputStrLn (show ctx) *> loop ctx
+          handleMetaCommand "context" _ = printContinue (show ctx)
           handleMetaCommand "t" t = handleMetaCommand "type" t
           handleMetaCommand "type" tStr = case parseDecorateTerm ctx tStr of
-            Left err -> outputStrLn err *> loop ctx
+            Left err -> printContinue err
             Right t -> let ty = typeOf ctx t
-              in outputStrLn (showTermType ctx t ty) *> loop ctx
-          handleMetaCommand _ _ = outputStrLn "Unrecognized command" *> loop ctx
+              in printContinue (showTermType ctx t ty)
+          handleMetaCommand "s" t = handleMetaCommand "show" t
+          handleMetaCommand "show" tStr = case parseDecorateTerm ctx tStr of
+            Left err -> printContinue err
+            Right t -> let ty = typeOf ctx t
+              in printContinue (unwords [show t, ":", show ty])
+          handleMetaCommand "es" t = handleMetaCommand "evalShow" t
+          handleMetaCommand "evalShow" tStr =
+            case processInput ctx "*REPL*" tStr of
+              Left err -> printContinue err
+              Right (os `InCtx` _) -> mapM_ (outputStrLn.show.snd) os
+                *> loop ctx
+          handleMetaCommand _ _ = printContinue "Unrecognized command"
 
 
 main :: IO ()

@@ -69,6 +69,7 @@ eval1 ctx = go
     go TAbs{} = Nothing
     go (TApp _ (TAbs _ _ t11) tyT2) =
       Just $ tytermSubstTop tyT2 t11
+    go (TApp _ n@Nil_{} _) = Just n
     go (TApp fi t1 tyT2) = eval1 ctx t1 >>= \t1' -> Just $ TApp fi t1' tyT2
     go (TUnpack _fi _ _ (TPack _ tyT11 v12 _) t2)
       | isVal ctx v12 = Just
