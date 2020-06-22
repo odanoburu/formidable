@@ -48,9 +48,6 @@ decor (Ascribe fi t ty) ctx =
 decor (FixOp mty) ctx =
   let mty' = fmap (`decorT` ctx) mty
   in FixOp mty'
-decor (Fix fi t) ctx =
-  let t' = decor t ctx
-  in Fix fi t'
 decor (Tuple fi ts) ctx =
   let ts' = fmap (`decor` ctx) ts
   in Tuple fi ts'

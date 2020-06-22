@@ -82,7 +82,6 @@ data Term
   | TPack Info Type Term Type             -- packing
   | TUnpack Info String String Term Term  -- unpacking
 -- add-ons
-  | Fix Info Term
   | FixOp (Maybe Type)
   | Ascribe Info Term Type
   | Tuple Info [Term]
@@ -200,7 +199,6 @@ tmmap onVar onType = go
     go c (IsNilOp mty) = IsNilOp $ fmap (onType c) mty
     go c (HeadOp mty) = HeadOp $ fmap (onType c) mty
     go c (TailOp mty) = TailOp $ fmap (onType c) mty
-    go c (Fix fi t) = Fix fi $ go c t
     go c (Tuple fi ts) = Tuple fi $ fmap (go c) ts
     go c (TupleProj fi tu ti) = TupleProj fi (go c tu) (go c ti)
     go _ Nil = Nil
@@ -426,10 +424,7 @@ prettyTerm ctx (Abs _ x ty t) =
   $ "λ" <+> pretty x' <> ":" <> prettyType ctx ty <> "."
   <> softline <> prettyTerm ctx' t
 prettyTerm _ (FixOp Nothing) = "fix"
-prettyTerm ctx (FixOp (Just ty)) = "fix" <+> "[" <> prettyType ctx ty <> "]"
-prettyTerm ctx (Fix _ t)
-  = align
-  $ "fix" <+> prettyTerm ctx t
+prettyTerm ctx (FixOp (Just ty)) = "fix" <+> "@" <> prettyType ctx ty
 prettyTerm ctx (TIf _ tcond tt tf)
   = align
   $ "if" <+> prettyTerm ctx tcond

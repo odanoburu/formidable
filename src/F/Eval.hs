@@ -49,7 +49,6 @@ isVal _ TApp{} = False
 isVal _ TUnpack{} = False
 isVal _ Ascribe{} = False
 isVal _ FixOp{} = True
-isVal _ Fix{} = False
 isVal _ TupleProj{} = False
 isVal _ TIf{} = False
 isVal _ TIsZero{} = False
@@ -102,9 +101,6 @@ eval1 ctx = go
       | isVal ctx t = Just t
     go (Ascribe fi t ty) = eval1 ctx t >>= Just . flip (Ascribe fi) ty
     go FixOp{} = Nothing
-    go t@(Fix _ (Abs _ _ _ body)) =
-      Just $ termSubstTop t body
-    go (Fix fi t) = eval1 ctx t >>= Just . Fix fi
     go (Tuple fi ts) = evalList (Tuple fi) ts
     go (TupleProj _ (Tuple _ []) _) = Nothing -- DOUBT: will typeOf get this error?
     go (TupleProj _ (Tuple _ (t:_)) TZero{})
@@ -204,13 +200,6 @@ typeOf ctx = go
         (True, ty') -> ty'
         (False, ty') -> unexpected fi "as-type" ty t ty'
     go (FixOp mTy) = fixType ctx mTy Nothing
-    go (Fix fi t) =
-      case simpleTypeOf t of
-        (TyArr ty ty') ->
-          if typeEqv ctx ty ty'
-          then ty'
-          else err fi "fix: domain-incompatible body result"
-        _ -> err fi "fix: arrow type expected"
     go (Tuple _ ts) = TyTuple $ fmap (typeOf ctx) ts
     go (TupleProj fi tu ti) =
       case simpleTypeOf tu of
