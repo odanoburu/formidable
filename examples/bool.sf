@@ -3,3 +3,7 @@
 
 not = λb:Bool. if b then #f else #t ;
 
+not #t ;
+
+not #f ;
+

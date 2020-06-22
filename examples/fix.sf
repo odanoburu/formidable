@@ -12,3 +12,5 @@ nn = λh:Nat -> Nat -> Nat.
 plus = fixNat nn ;
 
 plus 3 4 ;
+
+plus 0 1 ;

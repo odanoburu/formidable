@@ -14,6 +14,7 @@ module F.Syntax (
   freshName,
   headTerm,
   headType,
+  ii,
   isNilTerm,
   nilType,
   pix,
@@ -33,6 +34,7 @@ module F.Syntax (
   showTerm,
   showTermType,
   showType,
+  unexpected,
   ) where
 
 
@@ -40,7 +42,7 @@ import Data.List (findIndex)
 import Data.Semigroup (Sum(..))
 import Data.Text.Prettyprint.Doc ((<>), (<+>), Doc, Pretty(..),
                                   align, encloseSep, flatAlt, group,
-                                  softline)
+                                  nest, softline, vsep)
 --import Debug.Trace (trace)
 import Prelude hiding ((!!))
 
@@ -77,32 +79,38 @@ data Type
 
 data Term
 -- pure LC
-  = Var Info String Int Int               -- variable
-  | Abs Info String Type Term             -- abstraction
-  | App Info Term Term                    -- application
+  = Var {i :: Info, name :: String, ix :: Int, len :: Int} -- variable
+  | Abs {i :: Info, var :: String, ty :: Type, t :: Term}  -- abstraction
+  | App {i :: Info, l :: Term, r :: Term}                  -- application
 -- type stuff
-  | TAbs Info String Term                 -- type abstraction
-  | TApp Info Term Type                   -- type application
-  | TPack Info Type Term Type             -- packing
-  | TUnpack Info String String Term Term  -- unpacking
+  | TAbs {i :: Info, var :: String, t :: Term}             -- type abstraction
+  | TApp {i :: Info, t :: Term, ty :: Type}                -- type application
+  | TPack {i :: Info, ty :: Type, t :: Term, ex :: Type}  -- packing
+  | TUnpack {i :: Info, tyname :: String, tname :: String, l :: Term, t :: Term}  -- unpacking
 -- add-ons
-  | Fix_ Info Term
-  | Ascribe Info Term Type
-  | Tuple Info [Term]
-  | TupleProj Info Term Term
-  | Cons_ Info Term Term
-  | Nil_ Info
-  | IsNil_ Info Term
-  | Head_ Info Term
-  | Tail_ Info Term
-  | TTrue Info
-  | TFalse Info
-  | TIf Info Term Term Term
-  | TZero Info
-  | TSucc Info Term
-  | TPred Info Term
-  | TIsZero Info Term
+  | Fix_ {i :: Info, t :: Term}
+  | Ascribe {i :: Info, t :: Term, ty :: Type}
+  | Tuple {i :: Info, ts :: [Term]}
+  | TupleProj {i :: Info, t :: Term, i :: Term}
+  | Cons_ {i :: Info, th :: Term, tt :: Term}
+  | Nil_ {i :: Info}
+  | IsNil_ {i :: Info, t :: Term}
+  | Head_ {i :: Info, t :: Term}
+  | Tail_ {i :: Info, t :: Term}
+  | TTrue {i :: Info}
+  | TFalse {i :: Info}
+  | TIf {i :: Info, tcond :: Term, tt :: Term, tf :: Term}
+  | TZero {i :: Info}
+  | TSucc {i :: Info, t :: Term}
+  | TPred {i :: Info, t :: Term}
+  | TIsZero {i :: Info, t :: Term}
   deriving (Eq, Show)
+
+
+-- INVARIANT: all Terms must have info field
+ii :: Info -> Term -> Term
+-- | inherit info from parent term
+ii parentInfo tchild = tchild{i = parentInfo <> i tchild}
 
 
 data Binding
@@ -551,6 +559,17 @@ prettyBinding ctx = go
     go (TypeBind _) = ":: *"
     go (TermBind _ Nothing) = mempty
     go (TermBind _ (Just ty)) = ":" <+> prettyType ctx ty
+
+
+unexpected :: Context -> Info -> String -> Type -> Term -> Type -> a
+unexpected ctx fi fname expected term found
+      = err fi . show . nest 2
+        $ vsep [ pretty fname
+                 <> ": expected type"
+                 <+> prettyType ctx expected
+               , "for term" <+> prettyTerm ctx term
+               , "found type" <+> prettyType ctx found <+> "instead"
+               ]
 
 
 pix :: Int

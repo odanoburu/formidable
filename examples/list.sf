@@ -1,25 +1,24 @@
 nil ;
 
-emptyBoolList = nil @Bool ;
+emptyNatList = nil @Nat ;
 
 cons ;
 
-boolCons = cons @Bool ;
+natCons = cons @Nat ;
 
-boolList = boolCons #f (boolCons #t emptyBoolList) ;
+natList = natCons 1 (natCons 2 emptyNatList) ;
 
-boolList ;
+natList ;
 
-isNil ;
+isNil @Nat emptyNatList ;
 
-isNil @Nat ;
+head @Nat natList ;
 
-isNil @Bool emptyBoolList ;
+isNil @Nat natList ;
 
-isNil @Bool boolList ;
+head @Nat natList ;
 
-head @Bool boolList ;
+head @Nat (tail @Nat natList) ;
 
-head @Bool (tail @Bool boolList) ;
 
 
