@@ -45,9 +45,9 @@ decor (Ascribe fi t ty) ctx =
   let t' = decor t ctx
       ty' = decorT ty ctx
   in Ascribe fi t' ty'
-decor (FixOp mty) ctx =
-  let mty' = fmap (`decorT` ctx) mty
-  in FixOp mty'
+decor (Fix_ fi t) ctx =
+  let t' = t `decor` ctx
+  in Fix_ fi t'
 decor (Tuple fi ts) ctx =
   let ts' = fmap (`decor` ctx) ts
   in Tuple fi ts'
@@ -59,7 +59,7 @@ decor (Cons_ fi th tt) ctx =
   let th' = th `decor` ctx
       tt' = tt `decor` ctx
   in Cons_ fi th' tt'
-decor n@Nil{} _ = n
+decor n@Nil_{} _ = n
 decor (IsNil_ fi t) ctx =
   let t' = t `decor` ctx
   in IsNil_ fi t'

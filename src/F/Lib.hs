@@ -8,13 +8,15 @@ module F.Lib
     ) where
 
 
-import F.Syntax ( Binding(..), Command(..), Context(..), Term(..), Type(..)
-                , addBinding, consTerm, consType, headTerm, headType, isNilTerm
+import F.Syntax ( Binding(..), Command(..), Context(..), Info(..)
+                , Term(..), Type(..)
+                , addBinding, consTerm, consType, fixTerm, fixType
+                , headTerm, headType, isNilTerm
                 , isNilType, makeContext, nilType, showError
                 , prettyBinding, showTermType, tailTerm, tailType, termShift)
 import F.Parser (parseCommands, parseTerm)
 import F.Decor (decor)
-import F.Eval (InContext(..), eval, evalBinding, fixType, simplifyType, typeOf)
+import F.Eval (InContext(..), eval, evalBinding, simplifyType, typeOf)
 
 
 import Data.Bifunctor (bimap)
@@ -79,8 +81,8 @@ parseDecorateTerm ctx input = bimap id (`decor` ctx)
 
 initialContext :: Context
 initialContext =
-  makeContext [ define "fix" FixOp (`fixType` Nothing)
-              , define "nil" (const Nil) nilType
+  makeContext [ define "fix" (const $ fixTerm mempty) (`fixType` Nothing)
+              , define "nil" (const $ Nil_ None) nilType
               , define "cons" (const (consTerm mempty)) consType
               , define "isNil" (const (isNilTerm mempty)) isNilType
               , define "head" (const (headTerm mempty)) headType

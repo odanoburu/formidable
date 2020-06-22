@@ -9,6 +9,7 @@ module F.Syntax (
   makeContext,
   consTerm,
   consType,
+  fixTerm,
   fixType,
   freshName,
   headTerm,
@@ -85,12 +86,12 @@ data Term
   | TPack Info Type Term Type             -- packing
   | TUnpack Info String String Term Term  -- unpacking
 -- add-ons
-  | FixOp (Maybe Type)
+  | Fix_ Info Term
   | Ascribe Info Term Type
   | Tuple Info [Term]
   | TupleProj Info Term Term
   | Cons_ Info Term Term
-  | Nil
+  | Nil_ Info
   | IsNil_ Info Term
   | Head_ Info Term
   | Tail_ Info Term
@@ -198,14 +199,14 @@ tmmap onVar onType = go
     go c (TUnpack fi tyX x t1 t2) =
       TUnpack fi tyX x (go c t1) (go (c+2) t2)
     go c (Ascribe fi t ty) = Ascribe fi (go c t) (onType c ty)
-    go c (FixOp mty) = FixOp $ fmap (onType c) mty
+    go c (Fix_ fi t) = Fix_ fi $ go c t
     go c (Cons_ fi th tt) = Cons_ fi (go c th) (go c tt)
     go c (IsNil_ fi t) = IsNil_ fi $ go c t
     go c (Head_ fi t) = Head_ fi $ go c t
     go c (Tail_ fi t) = Tail_ fi $ go c t
     go c (Tuple fi ts) = Tuple fi $ fmap (go c) ts
     go c (TupleProj fi tu ti) = TupleProj fi (go c tu) (go c ti)
-    go _ Nil = Nil
+    go _ n@Nil_{} = n
     go _ t@TTrue{} = t
     go _ f@TFalse{} = f
     go c (TIf fi tcond tt tf) = TIf fi (go c tcond) (go c tt) (go c tf)
@@ -375,6 +376,19 @@ consTerm ctx
     tyX = snd $ freshName ctx "X"
 
 
+fixTerm :: Context -> Term
+fixTerm ctx
+  = TAbs d tyX
+    (TAbs d tyY
+     (Abs d "f" (fixType ctx (Just $ TyVar 1 2 tyX) (Just $ TyVar 0 2 tyY))
+      (Abs d "x" (TyVar 2 3 tyX)
+        (App d (Fix_ d $ Var d "f" 1 4) (Var d "x" 0 4)))))
+  where
+    d = None
+    tyX = snd $ freshName ctx "X"
+    tyY = snd $ freshName ctx "Y"
+
+
 universalType :: (Type -> Type) -> Context -> Maybe Type -> Type
 universalType f ctx mty =
   case mty of
@@ -416,7 +430,7 @@ fixType ctx mTyX mTyY =
     fixType' tyX tyY = TyArr (TyArr (TyArr tyX tyY)
                                 (TyArr tyX tyY))
                          (TyArr tyX tyY)
-                                                         
+
 
 
 prettyType :: Context -> Type -> Doc a
@@ -458,8 +472,7 @@ prettyTerm ctx (Abs _ x ty t) =
   in align
   $ "λ" <+> pretty x' <> ":" <> prettyType ctx ty <> "."
   <> softline <> prettyTerm ctx' t
-prettyTerm _ (FixOp Nothing) = "fix"
-prettyTerm ctx (FixOp (Just ty)) = "fix" <+> "@" <> prettyType ctx ty
+prettyTerm ctx (Fix_ _ t) = "fix" <+> prettyTerm ctx t
 prettyTerm ctx (TIf _ tcond tt tf)
   = align
   $ "if" <+> prettyTerm ctx tcond
@@ -497,7 +510,7 @@ prettyTerm appCtx appT = appTerm appCtx appT
     atomicTerm ctx (Cons_ _ th tt)
       = "(cons" <+> atomicTerm ctx th
       <+> atomicTerm ctx tt <> ")"
-    atomicTerm _ Nil{} = "nil"
+    atomicTerm _ Nil_{} = "nil"
     atomicTerm ctx (IsNil_ _ t) = "isNil" <+> atomicTerm ctx t
     atomicTerm ctx (Head_ _ t) = "head" <+> atomicTerm ctx t
     atomicTerm ctx (Tail_ _ t) = "tail" <+> atomicTerm ctx t
@@ -527,7 +540,7 @@ showTerm :: Context -> Term -> String
 showTerm ctx t = show $ prettyTerm ctx t
 
 showType :: Context -> Type -> String
-showType ctx ty = show $ prettyType ctx ty 
+showType ctx ty = show $ prettyType ctx ty
 
 
 prettyBinding :: Context -> Binding -> Doc a

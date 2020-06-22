@@ -34,7 +34,7 @@ isVal _ TAbs{}   = True
 isVal ctx (TPack _ _ v _) = isVal ctx v
 isVal ctx (Tuple _ ts) = all (isVal ctx) ts
 isVal ctx (Cons_ _ th tt) = isVal ctx th && isVal ctx tt
-isVal _ Nil{} = True
+isVal _ Nil_{} = True
 isVal _ IsNil_{} = False
 isVal _ Head_{} = False
 isVal _ Tail_{} = False
@@ -48,7 +48,7 @@ isVal _ App{} = False
 isVal _ TApp{} = False
 isVal _ TUnpack{} = False
 isVal _ Ascribe{} = False
-isVal _ FixOp{} = True
+isVal _ Fix_{} = False
 isVal _ TupleProj{} = False
 isVal _ TIf{} = False
 isVal _ TIsZero{} = False
@@ -63,17 +63,12 @@ eval1 ctx = go
     go Abs{} = Nothing
     go (App _ (Abs _ _ _ t12) v2)
       | isVal ctx v2 = Just $ termSubstTop v2 t12
-    go t@(App _ FixOp{} (Abs _ _ _ body))
-      = Just $ termSubstTop t body
-    go (App fi f@FixOp{} t) = eval1 ctx t >>= Just . App fi f
     go (App fi v1 t2)
       | isVal ctx v1 = eval1 ctx t2 >>= Just . App fi v1
     go (App fi t1 t2) = eval1 ctx t1 >>= \t1' -> Just $ App fi t1' t2
     go TAbs{} = Nothing
     go (TApp _ (TAbs _ _ t11) tyT2) =
       Just $ tytermSubstTop tyT2 t11
-    go (TApp _ FixOp{} ty) = Just . FixOp $ Just ty
-    go (TApp _ Nil{} _) = Just Nil
     go (TApp fi t1 tyT2) = eval1 ctx t1 >>= \t1' -> Just $ TApp fi t1' tyT2
     go (TUnpack _fi _ _ (TPack _ tyT11 v12 _) t2)
       | isVal ctx v12 = Just
@@ -85,7 +80,8 @@ eval1 ctx = go
     go (Ascribe _ t _)
       | isVal ctx t = Just t
     go (Ascribe fi t ty) = eval1 ctx t >>= Just . flip (Ascribe fi) ty
-    go FixOp{} = Nothing
+    go t@(Fix_ _ (Abs _ _ _ body)) = Just $ termSubstTop t body
+    go (Fix_ fi t) = eval1 ctx t >>= Just . Fix_ fi
     go (Tuple fi ts) = evalList (Tuple fi) ts
     go (TupleProj _ (Tuple _ []) _) = Nothing -- DOUBT: will typeOf get this error?
     go (TupleProj _ (Tuple _ (t:_)) TZero{})
@@ -105,15 +101,15 @@ eval1 ctx = go
       | isVal ctx th = eval1 ctx tt >>= Just . Cons_ fi th
     go (Cons_ fi th tt)
       = eval1 ctx th >>= Just . flip (Cons_ fi) tt
-    go Nil{} = Nothing
-    go (IsNil_ fi Nil{}) = Just $ TTrue fi
+    go Nil_{} = Nothing
+    go (IsNil_ fi Nil_{}) = Just $ TTrue fi
     go (IsNil_ fi Cons_{}) = Just $ TFalse fi
     go (IsNil_ fi t) =
       eval1 ctx t >>= Just . IsNil_ fi
-    go (Head_ fi Nil{})= err fi "head: empty list"
+    go (Head_ fi Nil_{})= err fi "head: empty list"
     go (Head_ _ (Cons_ _ t _)) = Just t
     go (Head_ fi t) = eval1 ctx t >>= Just . Head_ fi
-    go (Tail_ _ n@Nil{}) = Just n
+    go (Tail_ _ n@Nil_{}) = Just n
     go (Tail_ _ (Cons_ _ _ t)) = Just t
     go (Tail_ fi t) = eval1 ctx t >>= Just . Tail_ fi
     go TTrue{} = Nothing
@@ -191,7 +187,12 @@ typeOf ctx = go
       case t `typeIs` ty of
         (True, ty') -> ty'
         (False, ty') -> unexpected fi "as-type" ty t ty'
-    go (FixOp mTy) = fixType ctx mTy Nothing
+    go (Fix_ fi t) = case simpleTypeOf t of
+      (TyArr tyL tyR) ->
+        if typeEqv ctx tyL tyR
+        then tyL
+        else err fi "fix: expected arguments of arrow type to match"
+      _ -> err fi "fix: arrow type expected"
     go (Tuple _ ts) = TyTuple $ fmap (typeOf ctx) ts
     go (TupleProj fi tu ti) =
       case simpleTypeOf tu of
@@ -208,9 +209,10 @@ typeOf ctx = go
             (True, ty') -> ty'
             (False, ty') -> unexpected fi "cons" ty th ty'
         ty -> unexpected fi "cons" (TyList $ simpleTypeOf th) tt ty
-    go Nil = nilType ctx Nothing
+    go Nil_{} = nilType ctx Nothing
     go (IsNil_ fi t) = case simpleTypeOf t of
       TyList _ -> TyBool
+      -- FIXME: don't use TyId
       ty -> unexpected fi "isNil" (TyList $ TyId "a") t ty
     go (Head_ fi t) = case simpleTypeOf t of
       TyList ty -> ty
