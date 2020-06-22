@@ -55,20 +55,20 @@ decor (TupleProj fi tu ti) ctx =
   let tu' = decor tu ctx
       ti' = decor ti ctx
   in TupleProj fi tu' ti'
-decor (Cons fi th tt) ctx =
+decor (Cons_ fi th tt) ctx =
   let th' = th `decor` ctx
       tt' = tt `decor` ctx
-  in Cons fi th' tt'
+  in Cons_ fi th' tt'
 decor n@Nil{} _ = n
-decor (IsNil fi t) ctx =
+decor (IsNil_ fi t) ctx =
   let t' = t `decor` ctx
-  in IsNil fi t'
-decor (HeadOp mty) ctx =
-  let mty' = fmap (`decorT` ctx) mty
-  in HeadOp mty'
-decor (TailOp mty) ctx =
-  let mty' = fmap (`decorT` ctx) mty
-  in TailOp mty'
+  in IsNil_ fi t'
+decor (Head_ fi t) ctx =
+  let t' = t `decor` ctx
+  in Head_ fi t'
+decor (Tail_ fi t) ctx =
+  let t' = t `decor` ctx
+  in Tail_ fi t'
 decor t@TTrue{} _ = t
 decor f@TFalse{} _ = f
 decor (TIf fi tcond tt tf) ctx =

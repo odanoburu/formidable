@@ -9,9 +9,9 @@ module F.Lib
 
 
 import F.Syntax ( Binding(..), Command(..), Context(..), Term(..), Type(..)
-                , addBinding, consTerm, consType, headType, isNilTerm, isNilType
-                , makeContext, nilType, showError
-                , prettyBinding, showTermType, tailType, termShift)
+                , addBinding, consTerm, consType, headTerm, headType, isNilTerm
+                , isNilType, makeContext, nilType, showError
+                , prettyBinding, showTermType, tailTerm, tailType, termShift)
 import F.Parser (parseCommands, parseTerm)
 import F.Decor (decor)
 import F.Eval (InContext(..), eval, evalBinding, fixType, simplifyType, typeOf)
@@ -83,8 +83,8 @@ initialContext =
               , define "nil" (const Nil) nilType
               , define "cons" (const (consTerm mempty)) consType
               , define "isNil" (const (isNilTerm mempty)) isNilType
-              , define "head" HeadOp headType
-              , define "tail" TailOp tailType
+              , define "head" (const (headTerm mempty)) headType
+              , define "tail" (const (tailTerm mempty)) tailType
               ]
   where
     define name t fTy = (name, TermBind (t Nothing) . Just $ fTy mempty Nothing)

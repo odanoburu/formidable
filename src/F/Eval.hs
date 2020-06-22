@@ -11,11 +11,11 @@ module F.Eval
     ) where
 
 
-import F.Syntax (Type(..), Term(..), Binding(..), Context(..),
-                 addBinding, addName, dummyInfo, err,
-                 getBinding, getTypeFromContext, headType,
+import F.Syntax (Binding(..), Context(..), Info(..), Type(..), Term(..),
+                 addBinding, addName, err,
+                 getBinding, getTypeFromContext,
                  fixType, nilType,
-                 showTerm, showType, tailType,
+                 showTerm, showType,
                  termShift, termSubstTop, tytermSubstTop,
                  typeShift, typeSubstTop,
                  )
@@ -33,11 +33,11 @@ isVal _ Abs{}    = True
 isVal _ TAbs{}   = True
 isVal ctx (TPack _ _ v _) = isVal ctx v
 isVal ctx (Tuple _ ts) = all (isVal ctx) ts
-isVal ctx (Cons _ th tt) = isVal ctx th && isVal ctx tt
+isVal ctx (Cons_ _ th tt) = isVal ctx th && isVal ctx tt
 isVal _ Nil{} = True
-isVal _ IsNil{} = False
-isVal _ HeadOp{} = True
-isVal _ TailOp{} = True
+isVal _ IsNil_{} = False
+isVal _ Head_{} = False
+isVal _ Tail_{} = False
 isVal _ TTrue{}  = True
 isVal _ TFalse{} = True
 isVal _ TZero{}  = True
@@ -66,14 +66,6 @@ eval1 ctx = go
     go t@(App _ FixOp{} (Abs _ _ _ body))
       = Just $ termSubstTop t body
     go (App fi f@FixOp{} t) = eval1 ctx t >>= Just . App fi f
-    go (App fi HeadOp{} Nil{})
-      = err fi "head: empty list"
-    go (App _ HeadOp{} (Cons _ t _))
-      = Just t
-    go (App _ TailOp{} n@Nil{})
-      = Just n
-    go (App _ TailOp{} (Cons _ _ t))
-      = Just t
     go (App fi v1 t2)
       | isVal ctx v1 = eval1 ctx t2 >>= Just . App fi v1
     go (App fi t1 t2) = eval1 ctx t1 >>= \t1' -> Just $ App fi t1' t2
@@ -82,8 +74,6 @@ eval1 ctx = go
       Just $ tytermSubstTop tyT2 t11
     go (TApp _ FixOp{} ty) = Just . FixOp $ Just ty
     go (TApp _ Nil{} _) = Just Nil
-    go (TApp _ HeadOp{} ty) = Just . HeadOp $ Just ty
-    go (TApp _ TailOp{} ty) = Just . TailOp $ Just ty
     go (TApp fi t1 tyT2) = eval1 ctx t1 >>= \t1' -> Just $ TApp fi t1' tyT2
     go (TUnpack _fi _ _ (TPack _ tyT11 v12 _) t2)
       | isVal ctx v12 = Just
@@ -111,17 +101,21 @@ eval1 ctx = go
       eval1 ctx ti >>= Just . TupleProj fi tu
     go (TupleProj fi tu ti) =
       eval1 ctx tu >>= \tu' -> Just $ TupleProj fi tu' ti
-    go (Cons fi th tt)
-      | isVal ctx th = eval1 ctx tt >>= Just . Cons fi th
-    go (Cons fi th tt)
-      = eval1 ctx th >>= Just . flip (Cons fi) tt
+    go (Cons_ fi th tt)
+      | isVal ctx th = eval1 ctx tt >>= Just . Cons_ fi th
+    go (Cons_ fi th tt)
+      = eval1 ctx th >>= Just . flip (Cons_ fi) tt
     go Nil{} = Nothing
-    go (IsNil fi Nil{}) = Just $ TTrue fi
-    go (IsNil fi Cons{}) = Just $ TFalse fi
-    go (IsNil fi t) =
-      eval1 ctx t >>= Just . IsNil fi
-    go HeadOp{} = Nothing
-    go TailOp{} = Nothing
+    go (IsNil_ fi Nil{}) = Just $ TTrue fi
+    go (IsNil_ fi Cons_{}) = Just $ TFalse fi
+    go (IsNil_ fi t) =
+      eval1 ctx t >>= Just . IsNil_ fi
+    go (Head_ fi Nil{})= err fi "head: empty list"
+    go (Head_ _ (Cons_ _ t _)) = Just t
+    go (Head_ fi t) = eval1 ctx t >>= Just . Head_ fi
+    go (Tail_ _ n@Nil{}) = Just n
+    go (Tail_ _ (Cons_ _ _ t)) = Just t
+    go (Tail_ fi t) = eval1 ctx t >>= Just . Tail_ fi
     go TTrue{} = Nothing
     go TFalse{} = Nothing
     go (TIf _ TTrue{} tt _) = Just tt
@@ -207,7 +201,7 @@ typeOf ctx = go
             (False, ty)
               -> unexpected fi "!" TyNat ti ty
         _ -> err fi "!: tuple type expected as left argument"
-    go (Cons fi th tt) =
+    go (Cons_ fi th tt) =
       case simpleTypeOf tt of
         TyList ty ->
           case th `typeIs` ty of
@@ -215,9 +209,15 @@ typeOf ctx = go
             (False, ty') -> unexpected fi "cons" ty th ty'
         ty -> unexpected fi "cons" (TyList $ simpleTypeOf th) tt ty
     go Nil = nilType ctx Nothing
-    go (IsNil _ _) = TyBool
-    go (HeadOp mty) = headType ctx mty
-    go (TailOp mty) = tailType ctx mty
+    go (IsNil_ fi t) = case simpleTypeOf t of
+      TyList _ -> TyBool
+      ty -> unexpected fi "isNil" (TyList $ TyId "a") t ty
+    go (Head_ fi t) = case simpleTypeOf t of
+      TyList ty -> ty
+      ty -> unexpected fi "head" (TyList $ TyId "a") t ty
+    go (Tail_ fi t) = case simpleTypeOf t of
+      TyList ty -> TyList ty
+      ty -> unexpected fi "tail" (TyList $ TyId "a") t ty
     go (TTrue _)  = TyBool
     go (TFalse _) = TyBool
     go (TIf fi tcond tt tf) =
@@ -298,7 +298,7 @@ simplifyType ctx = rewrite computeType
 
 maybeAbscription :: Context -> Int -> Maybe Type
 maybeAbscription ctx i =
-  case getBinding dummyInfo ctx i of
+  case getBinding None ctx i of
     TypeBind tyT -> Just tyT
     _ -> Nothing
 

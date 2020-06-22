@@ -4,7 +4,6 @@ module F.Syntax (
   Command(..), Info(..), Type(..), Term(..), Binding(..), Context(..),
   TopLevel(..),
   addName,
-  dummyInfo,
   err,
   isNilType,
   makeContext,
@@ -12,10 +11,13 @@ module F.Syntax (
   consType,
   fixType,
   freshName,
+  headTerm,
   headType,
   isNilTerm,
   nilType,
   pix,
+  tailTerm,
+  tailType,
   termSubstTop,
   tytermSubstTop,
   typeSubstTop,
@@ -30,7 +32,6 @@ module F.Syntax (
   showTerm,
   showTermType,
   showType,
-  tailType,
   ) where
 
 
@@ -45,15 +46,16 @@ import Prelude hiding ((!!))
 
 ---
 -- types
-newtype Info = Offset Int
+data Info = None | Offset Int
   deriving (Show)
 
 instance Eq Info where
   _ == _ = True -- we don't care
 
-
-dummyInfo :: Info
-dummyInfo = Offset (-1)
+instance Semigroup Info where
+  None <> x = x
+  x <> None = x
+  _ <> y = y
 
 
 data Type
@@ -87,11 +89,11 @@ data Term
   | Ascribe Info Term Type
   | Tuple Info [Term]
   | TupleProj Info Term Term
-  | Cons Info Term Term
+  | Cons_ Info Term Term
   | Nil
-  | IsNil Info Term
-  | HeadOp (Maybe Type)
-  | TailOp (Maybe Type)
+  | IsNil_ Info Term
+  | Head_ Info Term
+  | Tail_ Info Term
   | TTrue Info
   | TFalse Info
   | TIf Info Term Term Term
@@ -99,6 +101,7 @@ data Term
   | TSucc Info Term
   | TPred Info Term
   | TIsZero Info Term
+--  | Alias_ Term String
   deriving (Eq, Show)
 
 
@@ -196,10 +199,10 @@ tmmap onVar onType = go
       TUnpack fi tyX x (go c t1) (go (c+2) t2)
     go c (Ascribe fi t ty) = Ascribe fi (go c t) (onType c ty)
     go c (FixOp mty) = FixOp $ fmap (onType c) mty
-    go c (Cons fi th tt) = Cons fi (go c th) (go c tt)
-    go c (IsNil fi t) = IsNil fi (go c t)
-    go c (HeadOp mty) = HeadOp $ fmap (onType c) mty
-    go c (TailOp mty) = TailOp $ fmap (onType c) mty
+    go c (Cons_ fi th tt) = Cons_ fi (go c th) (go c tt)
+    go c (IsNil_ fi t) = IsNil_ fi $ go c t
+    go c (Head_ fi t) = Head_ fi $ go c t
+    go c (Tail_ fi t) = Tail_ fi $ go c t
     go c (Tuple fi ts) = Tuple fi $ fmap (go c) ts
     go c (TupleProj fi tu ti) = TupleProj fi (go c tu) (go c ti)
     go _ Nil = Nil
@@ -298,6 +301,7 @@ indexToName fi (Ctx ctx (Sum n)) i = case ctx !! i of
   Just (vn, _) -> vn
   Nothing -> variableLookupFailure fi i n
 
+
 variableLookupFailure :: Info -> Int -> Int -> a
 variableLookupFailure fi i n = err fi $
   unwords ["Variable lookup failure: offset was", show i,
@@ -311,6 +315,7 @@ err fi msg = error $ showError fi msg
 
 
 showError :: Info -> String -> String
+showError None msg = msg
 showError (Offset n) msg = concat [show n, ":", msg]
 
 
@@ -329,13 +334,34 @@ freshName c@(Ctx ctx (Sum n)) x =
   where
     isBound = x `elem` fmap fst ctx
 
+
 isNilTerm :: Context -> Term
 isNilTerm ctx
   = TAbs d tyX
     (Abs d "xs" (TyList (TyVar 0 1 tyX))
-    (IsNil d (Var d "xs" 1 2)))
+    (IsNil_ d (Var d "xs" 1 2)))
   where
-    d = dummyInfo
+    d = None
+    tyX = snd $ freshName ctx "X"
+
+
+headTerm :: Context -> Term
+headTerm ctx
+  = TAbs d tyX
+    (Abs d "xs" (TyList (TyVar 0 1 tyX))
+    (Head_ d (Var d "xs" 1 2)))
+  where
+    d = None
+    tyX = snd $ freshName ctx "X"
+
+
+tailTerm :: Context -> Term
+tailTerm ctx
+  = TAbs d tyX
+    (Abs d "xs" (TyList (TyVar 0 1 tyX))
+    (Tail_ d (Var d "xs" 1 2)))
+  where
+    d = None
     tyX = snd $ freshName ctx "X"
 
 consTerm :: Context -> Term
@@ -343,9 +369,9 @@ consTerm ctx
   = TAbs d tyX
     (Abs d "x" (TyVar 0 1 tyX)
       (Abs d "xs" (TyList (TyVar 1 2 tyX))
-        (Cons d (Var d "x" 2 3) (Var d "xs" 0 3))))
+        (Cons_ d (Var d "x" 2 3) (Var d "xs" 0 3))))
   where
-    d = dummyInfo
+    d = None
     tyX = snd $ freshName ctx "X"
 
 
@@ -468,13 +494,13 @@ prettyTerm appCtx appT = appTerm appCtx appT
     pathTerm ctx t = atomicTerm ctx t
     atomicTerm _ (Var _ vn _ _) = pretty vn
     atomicTerm ctx (Tuple _ ts) = prettyTuple $ fmap (prettyTerm ctx) ts
-    atomicTerm ctx (Cons _ th tt)
+    atomicTerm ctx (Cons_ _ th tt)
       = "(cons" <+> atomicTerm ctx th
       <+> atomicTerm ctx tt <> ")"
     atomicTerm _ Nil{} = "nil"
-    atomicTerm ctx (IsNil _ t) = "isNil" <+> atomicTerm ctx t
-    atomicTerm _ HeadOp{} = "head"
-    atomicTerm _ TailOp{} = "tail"
+    atomicTerm ctx (IsNil_ _ t) = "isNil" <+> atomicTerm ctx t
+    atomicTerm ctx (Head_ _ t) = "head" <+> atomicTerm ctx t
+    atomicTerm ctx (Tail_ _ t) = "tail" <+> atomicTerm ctx t
     atomicTerm _ TTrue{} = "#t"
     atomicTerm _ TFalse{} = "#f"
     atomicTerm _ TZero{} = "0"
