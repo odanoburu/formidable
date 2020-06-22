@@ -9,7 +9,7 @@ module F.Lib
 
 
 import F.Syntax ( Binding(..), Command(..), Context(..), Term(..), Type(..)
-                , addBinding, consTerm, consType, headType, isNilType
+                , addBinding, consTerm, consType, headType, isNilTerm, isNilType
                 , makeContext, nilType, showError
                 , prettyBinding, showTermType, tailType, termShift)
 import F.Parser (parseCommands, parseTerm)
@@ -82,7 +82,7 @@ initialContext =
   makeContext [ define "fix" FixOp (`fixType` Nothing)
               , define "nil" (const Nil) nilType
               , define "cons" (const (consTerm mempty)) consType
-              , define "isNil" IsNilOp isNilType
+              , define "isNil" (const (isNilTerm mempty)) isNilType
               , define "head" HeadOp headType
               , define "tail" TailOp tailType
               ]

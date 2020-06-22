@@ -10,6 +10,10 @@ boolList = boolCons #f (boolCons #t emptyBoolList) ;
 
 boolList ;
 
+isNil ;
+
+isNil @Nat ;
+
 isNil @Bool emptyBoolList ;
 
 isNil @Bool boolList ;

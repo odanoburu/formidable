@@ -13,6 +13,7 @@ module F.Syntax (
   fixType,
   freshName,
   headType,
+  isNilTerm,
   nilType,
   pix,
   termSubstTop,
@@ -88,7 +89,7 @@ data Term
   | TupleProj Info Term Term
   | Cons Info Term Term
   | Nil
-  | IsNilOp (Maybe Type)
+  | IsNil Info Term
   | HeadOp (Maybe Type)
   | TailOp (Maybe Type)
   | TTrue Info
@@ -196,7 +197,7 @@ tmmap onVar onType = go
     go c (Ascribe fi t ty) = Ascribe fi (go c t) (onType c ty)
     go c (FixOp mty) = FixOp $ fmap (onType c) mty
     go c (Cons fi th tt) = Cons fi (go c th) (go c tt)
-    go c (IsNilOp mty) = IsNilOp $ fmap (onType c) mty
+    go c (IsNil fi t) = IsNil fi (go c t)
     go c (HeadOp mty) = HeadOp $ fmap (onType c) mty
     go c (TailOp mty) = TailOp $ fmap (onType c) mty
     go c (Tuple fi ts) = Tuple fi $ fmap (go c) ts
@@ -328,6 +329,14 @@ freshName c@(Ctx ctx (Sum n)) x =
   where
     isBound = x `elem` fmap fst ctx
 
+isNilTerm :: Context -> Term
+isNilTerm ctx
+  = TAbs d tyX
+    (Abs d "xs" (TyList (TyVar 0 1 tyX))
+    (IsNil d (Var d "xs" 1 2)))
+  where
+    d = dummyInfo
+    tyX = snd $ freshName ctx "X"
 
 consTerm :: Context -> Term
 consTerm ctx
@@ -463,7 +472,7 @@ prettyTerm appCtx appT = appTerm appCtx appT
       = "(cons" <+> atomicTerm ctx th
       <+> atomicTerm ctx tt <> ")"
     atomicTerm _ Nil{} = "nil"
-    atomicTerm _ IsNilOp{} = "isNil"
+    atomicTerm ctx (IsNil _ t) = "isNil" <+> atomicTerm ctx t
     atomicTerm _ HeadOp{} = "head"
     atomicTerm _ TailOp{} = "tail"
     atomicTerm _ TTrue{} = "#t"

@@ -60,9 +60,9 @@ decor (Cons fi th tt) ctx =
       tt' = tt `decor` ctx
   in Cons fi th' tt'
 decor n@Nil{} _ = n
-decor (IsNilOp mty) ctx =
-  let mty' = fmap (`decorT` ctx) mty
-  in IsNilOp mty'
+decor (IsNil fi t) ctx =
+  let t' = t `decor` ctx
+  in IsNil fi t'
 decor (HeadOp mty) ctx =
   let mty' = fmap (`decorT` ctx) mty
   in HeadOp mty'

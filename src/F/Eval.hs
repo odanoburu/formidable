@@ -13,7 +13,7 @@ module F.Eval
 
 import F.Syntax (Type(..), Term(..), Binding(..), Context(..),
                  addBinding, addName, dummyInfo, err,
-                 getBinding, getTypeFromContext, headType, isNilType,
+                 getBinding, getTypeFromContext, headType,
                  fixType, nilType,
                  showTerm, showType, tailType,
                  termShift, termSubstTop, tytermSubstTop,
@@ -35,7 +35,7 @@ isVal ctx (TPack _ _ v _) = isVal ctx v
 isVal ctx (Tuple _ ts) = all (isVal ctx) ts
 isVal ctx (Cons _ th tt) = isVal ctx th && isVal ctx tt
 isVal _ Nil{} = True
-isVal _ IsNilOp{} = True
+isVal _ IsNil{} = False
 isVal _ HeadOp{} = True
 isVal _ TailOp{} = True
 isVal _ TTrue{}  = True
@@ -66,10 +66,6 @@ eval1 ctx = go
     go t@(App _ FixOp{} (Abs _ _ _ body))
       = Just $ termSubstTop t body
     go (App fi f@FixOp{} t) = eval1 ctx t >>= Just . App fi f
-    go (App fi IsNilOp{} Nil{})
-      = Just $ TTrue fi
-    go (App fi IsNilOp{} Cons{})
-      = Just $ TFalse fi
     go (App fi HeadOp{} Nil{})
       = err fi "head: empty list"
     go (App _ HeadOp{} (Cons _ t _))
@@ -86,7 +82,6 @@ eval1 ctx = go
       Just $ tytermSubstTop tyT2 t11
     go (TApp _ FixOp{} ty) = Just . FixOp $ Just ty
     go (TApp _ Nil{} _) = Just Nil
-    go (TApp _ IsNilOp{} ty) = Just . IsNilOp $ Just ty
     go (TApp _ HeadOp{} ty) = Just . HeadOp $ Just ty
     go (TApp _ TailOp{} ty) = Just . TailOp $ Just ty
     go (TApp fi t1 tyT2) = eval1 ctx t1 >>= \t1' -> Just $ TApp fi t1' tyT2
@@ -121,7 +116,10 @@ eval1 ctx = go
     go (Cons fi th tt)
       = eval1 ctx th >>= Just . flip (Cons fi) tt
     go Nil{} = Nothing
-    go IsNilOp{} = Nothing
+    go (IsNil fi Nil{}) = Just $ TTrue fi
+    go (IsNil fi Cons{}) = Just $ TFalse fi
+    go (IsNil fi t) =
+      eval1 ctx t >>= Just . IsNil fi
     go HeadOp{} = Nothing
     go TailOp{} = Nothing
     go TTrue{} = Nothing
@@ -217,7 +215,7 @@ typeOf ctx = go
             (False, ty') -> unexpected fi "cons" ty th ty'
         ty -> unexpected fi "cons" (TyList $ simpleTypeOf th) tt ty
     go Nil = nilType ctx Nothing
-    go (IsNilOp mty) = isNilType ctx mty
+    go (IsNil _ _) = TyBool
     go (HeadOp mty) = headType ctx mty
     go (TailOp mty) = tailType ctx mty
     go (TTrue _)  = TyBool
