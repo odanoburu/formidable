@@ -102,7 +102,6 @@ data Term
   | TSucc Info Term
   | TPred Info Term
   | TIsZero Info Term
---  | Alias_ Term String
   deriving (Eq, Show)
 
 
@@ -336,57 +335,57 @@ freshName c@(Ctx ctx (Sum n)) x =
     isBound = x `elem` fmap fst ctx
 
 
-isNilTerm :: Context -> Term
-isNilTerm ctx
+isNilTerm :: Term
+isNilTerm
   = TAbs d tyX
     (Abs d "xs" (TyList (TyVar 0 1 tyX))
     (IsNil_ d (Var d "xs" 1 2)))
   where
     d = None
-    tyX = snd $ freshName ctx "X"
+    tyX = "X"
 
 
-headTerm :: Context -> Term
-headTerm ctx
+headTerm :: Term
+headTerm
   = TAbs d tyX
     (Abs d "xs" (TyList (TyVar 0 1 tyX))
     (Head_ d (Var d "xs" 1 2)))
   where
     d = None
-    tyX = snd $ freshName ctx "X"
+    tyX = "X"
 
 
-tailTerm :: Context -> Term
-tailTerm ctx
+tailTerm :: Term
+tailTerm
   = TAbs d tyX
     (Abs d "xs" (TyList (TyVar 0 1 tyX))
     (Tail_ d (Var d "xs" 1 2)))
   where
     d = None
-    tyX = snd $ freshName ctx "X"
+    tyX = "X"
 
-consTerm :: Context -> Term
-consTerm ctx
+consTerm :: Term
+consTerm
   = TAbs d tyX
     (Abs d "x" (TyVar 0 1 tyX)
       (Abs d "xs" (TyList (TyVar 1 2 tyX))
         (Cons_ d (Var d "x" 2 3) (Var d "xs" 0 3))))
   where
     d = None
-    tyX = snd $ freshName ctx "X"
+    tyX = "X"
 
 
-fixTerm :: Context -> Term
-fixTerm ctx
+fixTerm :: Term
+fixTerm
   = TAbs d tyX
     (TAbs d tyY
-     (Abs d "f" (fixType ctx (Just $ TyVar 1 2 tyX) (Just $ TyVar 0 2 tyY))
+     (Abs d "f" (fixType mempty (Just $ TyVar 1 2 tyX) (Just $ TyVar 0 2 tyY))
       (Abs d "x" (TyVar 2 3 tyX)
         (App d (Fix_ d $ Var d "f" 1 4) (Var d "x" 0 4)))))
   where
     d = None
-    tyX = snd $ freshName ctx "X"
-    tyY = snd $ freshName ctx "Y"
+    tyX = "X"
+    tyY = "Y"
 
 
 universalType :: (Type -> Type) -> Context -> Maybe Type -> Type

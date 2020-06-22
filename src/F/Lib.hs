@@ -81,12 +81,12 @@ parseDecorateTerm ctx input = bimap id (`decor` ctx)
 
 initialContext :: Context
 initialContext =
-  makeContext [ define "fix" (const $ fixTerm mempty) (`fixType` Nothing)
-              , define "nil" (const $ Nil_ None) nilType
-              , define "cons" (const (consTerm mempty)) consType
-              , define "isNil" (const (isNilTerm mempty)) isNilType
-              , define "head" (const (headTerm mempty)) headType
-              , define "tail" (const (tailTerm mempty)) tailType
+  makeContext [ define "fix" fixTerm (`fixType` Nothing)
+              , define "nil" (Nil_ None) nilType
+              , define "cons" consTerm consType
+              , define "isNil" isNilTerm isNilType
+              , define "head" headTerm headType
+              , define "tail" tailTerm tailType
               ]
   where
-    define name t fTy = (name, TermBind (t Nothing) . Just $ fTy mempty Nothing)
+    define name t fTy = (name, TermBind t . Just $ fTy mempty Nothing)
