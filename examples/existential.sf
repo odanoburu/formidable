@@ -8,3 +8,7 @@ let {Counter, counter} = counterADT
 // without let bindings or records this is pretty hard to read, but oh
 // well…
 in (counter ! 1) (counter ! 2 (counter ! 0)) ;
+
+// naturalADT =
+//    {*(List <>), <nil @<>, λxs:List <>. cons @<> <> xs>}
+//    as Exists Natural, <Natural, Natural -> Natural> ;
