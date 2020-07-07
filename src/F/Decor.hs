@@ -93,7 +93,7 @@ decorT TyBool _ = TyBool
 decorT TyNat _ = TyNat
 decorT (TyId _) _ = error "decorT tyid"
 decorT (TyVar _ _ tvn) ctx@(Ctx _ (Sum n)) =
-  case nameToIndex (Offset $ -1) ctx tvn of
+  case nameToIndex None ctx tvn of
     Just tvi -> TyVar tvi n tvn
     Nothing -> TyId tvn
 decorT (TyArr t1 t2) ctx =

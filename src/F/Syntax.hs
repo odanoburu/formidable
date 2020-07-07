@@ -4,6 +4,8 @@ module F.Syntax (
   Command(..), Info(..), Type(..), Term(..), Binding(..), Context(..),
   TopLevel(..),
   addName,
+  addBindings,
+  dropBindingsUntil,
   err,
   isNilType,
   makeContext,
@@ -16,6 +18,7 @@ module F.Syntax (
   headType,
   ii,
   isNilTerm,
+  natToInt,
   nilType,
   pix,
   tailTerm,
@@ -70,6 +73,7 @@ data Type
   | TyVar Int Int String  -- type variable
   | TyArr Type Type       -- type of functions
   | TyAll String Type     -- universal type
+  | ExTyVar String
   | TySome String Type    -- existential type
   -- add-ons
   | TyTuple [Type]
@@ -91,7 +95,7 @@ data Term
   | Fix_ {i :: Info, t :: Term}
   | Ascribe {i :: Info, t :: Term, ty :: Type}
   | Tuple {i :: Info, ts :: [Term]}
-  | TupleProj {i :: Info, t :: Term, i :: Term}
+  | TupleProj {i :: Info, t :: Term, ixt :: Term}
   | Cons_ {i :: Info, th :: Term, tt :: Term}
   | Nil_ {i :: Info}
   | IsNil_ {i :: Info, t :: Term}
@@ -117,6 +121,9 @@ data Binding
   = NameBind
   | VarBind Type
   | TyVarBind
+  | ExTyVarBind
+  | ExTyMarker
+  | ExTySolution Type
   | TermBind Term (Maybe Type)
   | TypeBind Type
   deriving (Show)
@@ -264,6 +271,9 @@ makeContext bs = Ctx bs (Sum $ length bs)
 addBinding :: Context -> String -> Binding -> Context
 addBinding (Ctx ctx n) x bind = Ctx ((x,bind):ctx) (n+1)
 
+addBindings :: Context -> [(String, Binding)] -> Context
+addBindings ctx = foldr (\(n, b) ctx' -> addBinding ctx' n b) ctx
+
 addName :: Context -> String -> Context
 addName ctx x = addBinding ctx x NameBind
 
@@ -286,6 +296,14 @@ getBinding :: Info -> Context -> Int -> Binding
 getBinding fi (Ctx ctx (Sum n)) i = case ctx !! i of
   Just (_, bind) -> bindingShift (i+1) bind
   Nothing -> variableLookupFailure fi i n
+
+dropBindingsUntil :: String -> Context -> Context
+dropBindingsUntil vn = go
+  where
+    go ctx@(Ctx [] _) = ctx
+    go (Ctx ((vn', _):bs) (Sum n))
+      | vn == vn' = Ctx bs (Sum $ n-1)
+    go (Ctx (_:bs) (Sum n)) = go (Ctx bs (Sum $ n-1))
 
 
 getTypeFromContext :: Info -> Context -> Int -> Type
@@ -571,6 +589,11 @@ unexpected ctx fi fname expected term found
                , "found type" <+> prettyType ctx found <+> "instead"
                ]
 
+
+natToInt :: Term -> Int
+natToInt TSucc{t} = 1 + natToInt t
+natToInt TZero{} = 0
+natToInt t = err (i t) "Not a natural"
 
 pix :: Int
 -- placeholder index
