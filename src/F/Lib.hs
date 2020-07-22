@@ -90,3 +90,5 @@ initialContext =
               ]
   where
     define name t fTy = (name, TermBind t . Just $ fTy mempty Nothing)
+
+

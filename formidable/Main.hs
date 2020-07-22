@@ -5,6 +5,7 @@ import F.Lib (initialContext, processInput, parseDecorateTerm)
 import F.Eval (InContext(..), typeOf)
 import F.Parser (parseCommands)
 import F.Syntax (Context(..), showTermType)
+import F.Typing (typeIs)
 
 --import Control.Monad.IO.Class (liftIO)
 import Data.Char (isSpace)
@@ -104,8 +105,8 @@ runREPL _ = runInputT defaultSettings (loop initialContext)
           handleMetaCommand "t" t = handleMetaCommand "type" t
           handleMetaCommand "type" tStr = case parseDecorateTerm ctx tStr of
             Left err -> printContinue err
-            Right t -> let ty = typeOf ctx t
-              in printContinue (showTermType ctx t ty)
+            Right t -> let mty = typeIs ctx t
+              in printContinue $ maybe "Couldn't type :(" (showTermType ctx t) mty
           handleMetaCommand "s" t = handleMetaCommand "show" t
           handleMetaCommand "show" tStr = case parseDecorateTerm ctx tStr of
             Left err -> printContinue err

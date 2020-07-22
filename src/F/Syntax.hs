@@ -1,6 +1,5 @@
 {-# LANGUAGE StrictData #-}
 module F.Syntax (
-  (!!),
   Command(..), Info(..), Type(..), Term(..), Binding(..), Context(..),
   TopLevel(..),
   addName,
@@ -30,6 +29,7 @@ module F.Syntax (
   typeShift,
   getTypeFromContext,
   nameToIndex,
+  orderedInCtx,
   addBinding,
   getBinding,
   prettyBinding,
@@ -118,6 +118,7 @@ ii parentInfo tchild = tchild{i = parentInfo <> i tchild}
 
 
 data Binding
+  -- TODO: document these
   = NameBind
   | VarBind Type
   | TyVarBind
@@ -128,6 +129,10 @@ data Binding
   | TypeBind Type
   deriving (Show)
 
+existentialVarBinding :: Binding -> Bool
+existentialVarBinding ExTyMarker = True
+existentialVarBinding ExTyVarBind = True
+existentialVarBinding _ = False
 
 data Context = Ctx [(String, Binding)] (Sum Int)
 
@@ -139,6 +144,14 @@ instance Semigroup Context where
 
 instance Monoid Context where
   mempty = Ctx [] (Sum 0)
+
+orderedInCtx :: Context -> String -> String -> Bool
+orderedInCtx (Ctx bs' _) a b = go False bs' where
+  go seenA ((x,_):bs)
+    | x == a = go True bs
+    | x == b = seenA
+    | otherwise = go seenA bs
+  go _ [] = True
 
 
 data Command
@@ -172,6 +185,7 @@ tymap onVar = go
     go c (TySome tyX tyT2) = TySome tyX $ go (c+1) tyT2
     go c (TyTuple tys) = TyTuple $ fmap (go c) tys
     go c (TyList ty) = TyList $ go c ty
+    go _ (ExTyVar vn) = ExTyVar vn
 
 
 typeShiftAbove :: Int -> Int -> Type -> Type
@@ -272,7 +286,7 @@ addBinding :: Context -> String -> Binding -> Context
 addBinding (Ctx ctx n) x bind = Ctx ((x,bind):ctx) (n+1)
 
 addBindings :: Context -> [(String, Binding)] -> Context
-addBindings ctx = foldr (\(n, b) ctx' -> addBinding ctx' n b) ctx
+addBindings = foldr (\(n, b) ctx' -> addBinding ctx' n b)
 
 addName :: Context -> String -> Context
 addName ctx x = addBinding ctx x NameBind
@@ -290,10 +304,13 @@ bindingShift d (TermBind t mTy)
   = TermBind (termShift d t) $ fmap (typeShift d) mTy
 bindingShift d (TypeBind ty)
   = TypeBind $ typeShift d ty
+bindingShift _ b@ExTyVarBind = b
+bindingShift _ b@ExTyMarker = b
+bindingShift d (ExTySolution tyT) = ExTySolution $ typeShift d tyT
 
 
 getBinding :: Info -> Context -> Int -> Binding
-getBinding fi (Ctx ctx (Sum n)) i = case ctx !! i of
+getBinding fi ctx@(Ctx _ (Sum n)) i = case ctx .! i of
   Just (_, bind) -> bindingShift (i+1) bind
   Nothing -> variableLookupFailure fi i n
 
@@ -301,8 +318,9 @@ dropBindingsUntil :: String -> Context -> Context
 dropBindingsUntil vn = go
   where
     go ctx@(Ctx [] _) = ctx
-    go (Ctx ((vn', _):bs) (Sum n))
-      | vn == vn' = Ctx bs (Sum $ n-1)
+    go ctx@(Ctx ((vn', _):bs) (Sum n))
+      | vn == vn' = --ctx
+        Ctx bs (Sum $ n-1)
     go (Ctx (_:bs) (Sum n)) = go (Ctx bs (Sum $ n-1))
 
 
@@ -315,6 +333,9 @@ getTypeFromContext fi ctx i = case getBinding fi ctx i of
   TermBind _ Nothing -> err fi $
     "No type for variable " ++ varname
   TypeBind _ -> bindError
+  ExTySolution tyT -> tyT
+  ExTyVarBind -> bindError
+  ExTyMarker -> bindError
   where
     varname = indexToName fi ctx i
     bindError =
@@ -323,7 +344,7 @@ getTypeFromContext fi ctx i = case getBinding fi ctx i of
 
 
 indexToName :: Info -> Context -> Int -> String
-indexToName fi (Ctx ctx (Sum n)) i = case ctx !! i of
+indexToName fi ctx@(Ctx _ (Sum n)) i = case ctx .! i of
   Just (vn, _) -> vn
   Nothing -> variableLookupFailure fi i n
 
@@ -345,11 +366,14 @@ showError None msg = msg
 showError (Offset n) msg = concat [show n, ":", msg]
 
 
-infixl 9  !! -- safe indexing
-(!!) :: [a] -> Int -> Maybe a
-(x:_) !! 0 = Just x
-(_:xs) !! n = xs !! (n-1)
-[] !! _ = Nothing
+infixl 9  .! -- safe indexing
+(.!) :: Context -> Int -> Maybe (String, Binding)
+(Ctx bs _) .! ix = go bs ix where
+  go ((_, b'):xs) n
+    | existentialVarBinding b' = go xs n
+  go (x:_) 0 = Just x
+  go (_:xs) n = go xs (n-1)
+  go [] _ = Nothing
 
 
 freshName :: Context -> String -> (Context, String)
@@ -471,6 +495,7 @@ prettyType ctx' tyT = arrowType ctx' tyT
       <> softline <> arrowType ctx tyR
     arrowType ctx ty = atomicType ctx ty
     atomicType _ (TyVar _ _ x) = pretty x
+    atomicType _ (ExTyVar x) = pretty x
     atomicType _ (TyId b) = pretty b
     atomicType ctx (TyTuple tys) = prettyTuple $ fmap (prettyType ctx) tys
     atomicType ctx (TyList ty) = "List" <+> prettyType ctx ty
@@ -552,6 +577,7 @@ prettyTerm appCtx appT = appTerm appCtx appT
       $ "{*" <> prettyType ctx ty <> "," <> softline
       <> prettyTerm ctx t <> "}"
       <+> "as" <+> prettyType ctx ty'
+    atomicTerm ctx Ascribe{t} = prettyTerm ctx t
     atomicTerm ctx t = "(" <> prettyTerm ctx t <> ")"
 
 
@@ -577,6 +603,9 @@ prettyBinding ctx = go
     go (TypeBind _) = ":: *"
     go (TermBind _ Nothing) = mempty
     go (TermBind _ (Just ty)) = ":" <+> prettyType ctx ty
+    go ExTyVarBind = mempty
+    go ExTyMarker = mempty
+    go (ExTySolution ty) = prettyType ctx ty
 
 
 unexpected :: Context -> Info -> String -> Type -> Term -> Type -> a

@@ -91,7 +91,8 @@ decor (TIsZero fi t) ctx =
 decorT :: Type -> Context -> Type
 decorT TyBool _ = TyBool
 decorT TyNat _ = TyNat
-decorT (TyId _) _ = error "decorT tyid"
+decorT ExTyVar{} _ = error "decorT extyvar"
+decorT TyId{} _ = error "decorT tyid"
 decorT (TyVar _ _ tvn) ctx@(Ctx _ (Sum n)) =
   case nameToIndex None ctx tvn of
     Just tvi -> TyVar tvi n tvn
